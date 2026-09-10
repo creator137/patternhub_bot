@@ -1,0 +1,1 @@
+"""PatternHub Bot application package."""
