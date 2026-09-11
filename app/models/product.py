@@ -6,6 +6,9 @@ from datetime import datetime
 from decimal import Decimal
 from urllib.parse import urlsplit, urlunsplit
 
+from app.models.audience import normalize_audience
+from app.models.categories import normalize_category
+
 
 def _clean_text(value: str | None) -> str | None:
     if value is None:
@@ -37,6 +40,7 @@ class ParsedProduct:
     product_url: str
     source_product_id: str | None = None
     brand: str | None = None
+    audience: str | None = None
     category: str | None = None
     subcategory: str | None = None
     price: Decimal | None = None
@@ -44,6 +48,7 @@ class ParsedProduct:
     currency: str | None = None
     is_sale: bool = False
     is_free: bool = False
+    is_new: bool = False
     sizes: tuple[str, ...] | None = None
     heights: tuple[str, ...] | None = None
     difficulty: str | None = None
@@ -65,22 +70,22 @@ class ParsedProduct:
             else None
         )
         is_free = self.is_free or price == Decimal("0.00")
-        is_sale = self.is_sale or (
-            price is not None and old_price is not None and old_price > price
-        )
+        is_sale = price is not None and old_price is not None and old_price > price
         return replace(
             self,
             source=source,
             source_product_id=_clean_text(self.source_product_id),
             name=name,
             brand=_clean_text(self.brand),
-            category=_clean_text(self.category),
+            audience=normalize_audience(self.audience),
+            category=normalize_category(self.category),
             subcategory=_clean_text(self.subcategory),
             price=price,
             old_price=old_price,
             currency=(_clean_text(self.currency) or "").upper() or None,
             is_sale=is_sale,
             is_free=is_free,
+            is_new=bool(self.is_new),
             sizes=_clean_values(self.sizes),
             heights=_clean_values(self.heights),
             difficulty=_clean_text(self.difficulty),
@@ -97,6 +102,7 @@ class Product:
     source_product_id: str | None
     name: str
     brand: str | None
+    audience: str | None
     category: str | None
     subcategory: str | None
     price: Decimal | None
@@ -104,6 +110,7 @@ class Product:
     currency: str | None
     is_sale: bool
     is_free: bool
+    is_new: bool
     sizes: tuple[str, ...] | None
     heights: tuple[str, ...] | None
     difficulty: str | None
@@ -117,18 +124,47 @@ class Product:
 
 
 @dataclass(frozen=True, slots=True)
+class CatalogCategory:
+    code: str
+    name: str
+    products: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProductFilter:
+    source: str | None = None
+    audience: str | tuple[str, ...] | None = None
+    category: str | None = None
+    is_sale: bool | None = None
+    is_free: bool | None = None
+    is_new: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SyncStats:
     source: str
     found: int
     added: int
     updated: int
+    skipped: int
+    unavailable: int
     errors: int
+    complete: bool
     duration_seconds: float
 
 
 @dataclass(frozen=True, slots=True)
 class CatalogStats:
     products: int
+    total: int
+    available: int
+    unavailable: int
     by_source: dict[str, int]
+    unavailable_by_source: dict[str, int]
     on_sale: int
+    new: int
     free: int
+    categories: int
+    no_price: int
+    no_image: int
+    by_audience: dict[str, int]

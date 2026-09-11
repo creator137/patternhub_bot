@@ -26,6 +26,7 @@ class VikiSewsProviderTests(unittest.TestCase):
         self.assertEqual(sale.name, "Милетта жакет")
         self.assertEqual(sale.price, Decimal("220.00"))
         self.assertEqual(sale.old_price, Decimal("440.00"))
+        self.assertEqual(sale.audience, "women")
         self.assertEqual(sale.category, "Жакеты и жилеты")
         self.assertTrue(sale.is_sale)
         self.assertEqual(free.price, Decimal("0.00"))
@@ -45,6 +46,37 @@ class VikiSewsProviderTests(unittest.TestCase):
         self.assertEqual(product.heights, ("154-160", "162-168"))
         self.assertEqual(product.difficulty, "Средний уровень")
         self.assertEqual(product.image_url, "https://cdn.example/gloria.jpg")
+
+    def test_vikisews_men_and_kids_keep_product_category(self) -> None:
+        men = ParsedProductLike(
+            audience=self.provider._audience_from_url(
+                "https://vikisews.com/vykrojki/muzhskie-vykrojki/muzhskie-brjuki/"
+            ),
+            category=self.provider._category_from_name("Мужские брюки"),
+        ).product
+        kids = ParsedProductLike(
+            audience=self.provider._audience_from_url(
+                "https://vikisews.com/vykrojki/detskie-vykrojki/detskoe-plate/"
+            ),
+            category=self.provider._category_from_name("Детское платье"),
+        ).product
+
+        self.assertEqual((men.audience, men.category), ("men", "Брюки и шорты"))
+        self.assertEqual((kids.audience, kids.category), ("kids", "Платья"))
+
+
+class ParsedProductLike:
+    def __init__(self, *, audience: str | None, category: str | None) -> None:
+        from app.models.product import ParsedProduct
+
+        self.product = ParsedProduct(
+            source="vikisews",
+            name="Тест",
+            brand="VikiSews",
+            audience=audience,
+            category=category,
+            product_url="https://vikisews.com/vykrojki/test/",
+        ).normalized()
 
 
 if __name__ == "__main__":

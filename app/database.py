@@ -36,6 +36,7 @@ class Database:
                     source_product_id TEXT,
                     name TEXT NOT NULL,
                     brand TEXT,
+                    audience TEXT,
                     category TEXT,
                     subcategory TEXT,
                     price TEXT,
@@ -43,6 +44,7 @@ class Database:
                     currency TEXT,
                     is_sale INTEGER NOT NULL DEFAULT 0,
                     is_free INTEGER NOT NULL DEFAULT 0,
+                    is_new INTEGER NOT NULL DEFAULT 0,
                     sizes TEXT,
                     heights TEXT,
                     difficulty TEXT,
@@ -63,6 +65,20 @@ class Database:
                     ON products(category);
                 """
             )
+            self._ensure_column(connection, "products", "is_new", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(connection, "products", "audience", "TEXT")
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_products_flags
+                    ON products(is_sale, is_free, is_new)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_products_audience_category
+                    ON products(audience, category)
+                """
+            )
             connection.executemany(
                 """
                 INSERT OR IGNORE INTO sources
@@ -71,17 +87,42 @@ class Database:
                 """,
                 (
                     ("vikisews", "VikiSews", "https://vikisews.com", 1),
-                    ("grasser", "Grasser", "https://grasser.ru", 0),
-                    ("helpersew", "HelperSew", "https://helpersew.com", 0),
+                    ("grasser", "Grasser", "https://grasser.ru", 1),
+                    ("helpersew", "HelperSew", "https://helpersew.com", 1),
                     (
                         "studio_yusupova",
                         "Studio Yusupova",
                         "https://studio-yusupova.ru",
                         0,
                     ),
-                    ("sewitnow", "Sew It Now", "https://sewitnow.ru", 0),
+                    ("sewitnow", "SewItNow", "https://sewitnow.ru", 1),
                 ),
             )
+            connection.execute("UPDATE sources SET enabled = 1 WHERE name = 'grasser'")
+            connection.execute("UPDATE sources SET enabled = 1 WHERE name = 'helpersew'")
+            connection.execute(
+                "UPDATE sources SET enabled = 1 WHERE name = 'studio_yusupova'"
+            )
+            connection.execute(
+                """
+                UPDATE sources
+                SET display_name = 'SewItNow',
+                    base_url = 'https://sewitnow.ru',
+                    enabled = 1
+                WHERE name = 'sewitnow'
+                """
+            )
+
+    @staticmethod
+    def _ensure_column(
+        connection: sqlite3.Connection, table: str, column: str, definition: str
+    ) -> None:
+        columns = {
+            row["name"]
+            for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

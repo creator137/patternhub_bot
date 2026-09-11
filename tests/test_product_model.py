@@ -12,6 +12,7 @@ class ParsedProductTests(unittest.TestCase):
             source=" VIKIsews ",
             source_product_id=" 42 ",
             name="  Платье   Глория ",
+            audience=" Женские ",
             product_url="HTTPS://VIKISEWS.COM//vykrojki/item/#details",
             price=Decimal("100"),
             old_price=Decimal("200"),
@@ -21,6 +22,7 @@ class ParsedProductTests(unittest.TestCase):
 
         self.assertEqual(product.source, "vikisews")
         self.assertEqual(product.name, "Платье Глория")
+        self.assertEqual(product.audience, "women")
         self.assertEqual(product.product_url, "https://vikisews.com/vykrojki/item/")
         self.assertEqual(product.price, Decimal("100.00"))
         self.assertEqual(product.currency, "RUB")
@@ -36,6 +38,16 @@ class ParsedProductTests(unittest.TestCase):
         ).normalized()
 
         self.assertTrue(product.is_free)
+
+    def test_unknown_audience_stays_unknown(self) -> None:
+        product = ParsedProduct(
+            source="vikisews",
+            name="Pattern",
+            audience="для всех подряд",
+            product_url="https://vikisews.com/item/1",
+        ).normalized()
+
+        self.assertIsNone(product.audience)
 
 
 if __name__ == "__main__":

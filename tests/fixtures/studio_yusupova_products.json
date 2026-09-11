@@ -1,0 +1,104 @@
+[
+  {
+    "id": 176766,
+    "name": "Дубленка Мирей О",
+    "permalink": "https://studio-yusupova.ru/shop/jacket-mireille-o/",
+    "description": "<p>Выкройка пальто умеренного объёма.</p>",
+    "on_sale": false,
+    "prices": {
+      "price": "490",
+      "regular_price": "490",
+      "sale_price": "490",
+      "currency_code": "RUB"
+    },
+    "images": [{"src": "https://studio-yusupova.ru/wp-content/uploads/mireille.jpg"}],
+    "categories": [{"id": 59, "name": "Верхняя одежда"}],
+    "attributes": [
+      {"name": "Размер", "terms": [{"name": "40"}, {"name": "42"}]},
+      {"name": "Рост", "terms": [{"name": "162-166"}, {"name": "168-172"}]}
+    ],
+    "is_purchasable": true,
+    "is_in_stock": true,
+    "is_password_protected": false
+  },
+  {
+    "id": 180001,
+    "name": "Блузка Самира Б",
+    "permalink": "https://studio-yusupova.ru/shop/blouse-samira-b/",
+    "description": "",
+    "on_sale": true,
+    "prices": {
+      "price": "380",
+      "regular_price": "480",
+      "sale_price": "380",
+      "currency_code": "RUB"
+    },
+    "images": [{"src": "https://studio-yusupova.ru/wp-content/uploads/samira.jpg"}],
+    "categories": [{"id": 61, "name": "Блузки, топы, рубашки"}],
+    "attributes": [],
+    "is_purchasable": true,
+    "is_in_stock": true,
+    "is_password_protected": false
+  },
+  {
+    "id": 33405,
+    "name": "Спортивные брюки Клайд",
+    "permalink": "https://studio-yusupova.ru/shop/sport-bruki-clyde/",
+    "description": "",
+    "on_sale": false,
+    "prices": {
+      "price": "290",
+      "regular_price": "290",
+      "sale_price": "290",
+      "currency_code": "RUB"
+    },
+    "images": [{"src": "https://studio-yusupova.ru/wp-content/uploads/clyde.jpg"}],
+    "categories": [
+      {"id": 50, "name": "Женская одежда"},
+      {"id": 49, "name": "Мужская одежда"},
+      {"id": 60, "name": "Брюки и шорты"}
+    ],
+    "attributes": [],
+    "is_purchasable": true,
+    "is_in_stock": true,
+    "is_password_protected": false
+  },
+  {
+    "id": 272,
+    "name": "Сорочка Keanu Reeves",
+    "permalink": "https://studio-yusupova.ru/shop/sorochka-keanu-reeves/",
+    "description": "",
+    "on_sale": false,
+    "prices": {
+      "price": "330",
+      "regular_price": "330",
+      "sale_price": "330",
+      "currency_code": "RUB"
+    },
+    "images": [{"src": "https://studio-yusupova.ru/wp-content/uploads/keanu.jpg"}],
+    "categories": [{"id": 49, "name": "Мужская одежда"}],
+    "attributes": [],
+    "is_purchasable": true,
+    "is_in_stock": true,
+    "is_password_protected": false
+  },
+  {
+    "id": 42863,
+    "name": "Юбка Miranda P",
+    "permalink": "https://studio-yusupova.ru/shop/skirt-miranda-p/",
+    "description": "",
+    "on_sale": false,
+    "prices": {
+      "price": "340",
+      "regular_price": "340",
+      "sale_price": "340",
+      "currency_code": "RUB"
+    },
+    "images": [{"src": "https://studio-yusupova.ru/wp-content/uploads/miranda.jpg"}],
+    "categories": [{"id": 57, "name": "Платья и юбки"}],
+    "attributes": [],
+    "is_purchasable": true,
+    "is_in_stock": true,
+    "is_password_protected": false
+  }
+]

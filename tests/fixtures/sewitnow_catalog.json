@@ -1,0 +1,156 @@
+{
+  "pageProps": {
+    "initSeller": {
+      "groups": [
+        {
+          "id": "5503",
+          "name": "Платья и комбинезоны",
+          "slug": "platya-i-kombinezony-5503",
+          "categories": [
+            {
+              "id": "34050",
+              "name": "Платья Весна/Осень",
+              "slug": "platya-vesnaosen-34050"
+            },
+            {
+              "id": "33038",
+              "name": "Комбинезоны",
+              "slug": "kombinezony-33038"
+            }
+          ]
+        },
+        {
+          "id": "5426",
+          "name": "Детские выкройки",
+          "slug": "detskie-vykroiki-5426",
+          "categories": [
+            {
+              "id": "33044",
+              "name": "Брюки",
+              "slug": "bryuki-33044"
+            }
+          ]
+        },
+        {
+          "id": "5500",
+          "name": "Бесплатные выкройки",
+          "slug": "besplatnye-vykroiki-5500",
+          "categories": [
+            {
+              "id": "33029",
+              "name": "Бесплатные выкройки",
+              "slug": "besplatnye-vykroiki-33029"
+            }
+          ]
+        }
+      ]
+    },
+    "initGetProducts": {
+      "page": 1,
+      "pages": 2,
+      "elements": 25,
+      "price_list": [],
+      "list": [
+        {
+          "id": 1054081,
+          "name": "Платье Эми",
+          "vendor_code": "100084",
+          "amount": 9999,
+          "price": "290",
+          "real_price": "390",
+          "status": true,
+          "variants_status": true,
+          "slug": "plate-emi-1054081",
+          "on_order": false,
+          "digital": true,
+          "images": [
+            {
+              "id": 1,
+              "product_id": 1054081,
+              "storage_object": {
+                "url": "https://sewitnow.ru/images/plate-emi.jpg"
+              },
+              "name": "plate"
+            }
+          ],
+          "product_attributes": [
+            {
+              "attribute_value": {
+                "id": 1,
+                "value": "158, 40"
+              }
+            }
+          ],
+          "category": {
+            "id": "34050",
+            "number": 1
+          },
+          "price_list": [],
+          "qty_unit": {
+            "title": "шт"
+          }
+        },
+        {
+          "id": 2055001,
+          "name": "Брюки детские",
+          "vendor_code": "200001",
+          "amount": 9999,
+          "price": "250",
+          "real_price": "250",
+          "status": true,
+          "slug": "bryuki-detskie-2055001",
+          "images": [
+            {
+              "storage_object": {
+                "url": "https://sewitnow.ru/images/kids-pants.jpg"
+              }
+            }
+          ],
+          "product_attributes": [
+            {
+              "attribute_value": {
+                "value": "104"
+              }
+            }
+          ],
+          "category": {
+            "id": "33044"
+          },
+          "price_list": []
+        },
+        {
+          "id": 3055001,
+          "name": "Юбка Эри",
+          "vendor_code": "300001",
+          "amount": 9999,
+          "price": "0",
+          "real_price": "0",
+          "status": true,
+          "slug": "yubka-eri-3055001",
+          "images": [],
+          "product_attributes": [],
+          "category": {
+            "id": "33029"
+          },
+          "price_list": []
+        },
+        {
+          "id": 4055001,
+          "name": "Игрушка Гусь",
+          "vendor_code": "400001",
+          "amount": 9999,
+          "price": "0",
+          "real_price": "0",
+          "status": true,
+          "slug": "igrushka-gus-4055001",
+          "images": [],
+          "product_attributes": [],
+          "category": {
+            "id": "33029"
+          },
+          "price_list": []
+        }
+      ]
+    }
+  }
+}

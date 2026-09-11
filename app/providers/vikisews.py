@@ -73,6 +73,7 @@ class VikiSewsProvider(BaseProvider):
             cookies={"django_language": "ru"},
             timeout=timeout,
             follow_redirects=True,
+            trust_env=False,
         ) as client:
             for page_number in range(1, self.max_pages + 1):
                 page_url = (
@@ -112,7 +113,7 @@ class VikiSewsProvider(BaseProvider):
                 logger.warning("VikiSews parser reached max_pages=%d", self.max_pages)
                 errors += 1
 
-        return ProviderResult(list(products_by_key.values()), errors)
+        return ProviderResult(list(products_by_key.values()), errors, complete=errors == 0)
 
     async def _get_page(
         self, client: httpx.AsyncClient, url: str
@@ -167,12 +168,16 @@ class VikiSewsProvider(BaseProvider):
             price, old_price, sale_marker = self._extract_prices(card)
             image_url = self._extract_image_url(card, page_url)
             category = self._category_from_url(product_url)
+            audience = self._audience_from_url(product_url)
+            if audience in {"men", "kids"}:
+                category = self._category_from_name(name_node.get_text(" ", strip=True))
             products.append(
                 ParsedProduct(
                     source=self.source,
                     source_product_id=source_product_id,
                     name=name_node.get_text(" ", strip=True),
                     brand="VikiSews",
+                    audience=audience,
                     category=category,
                     subcategory=category,
                     price=price,
@@ -231,11 +236,15 @@ class VikiSewsProvider(BaseProvider):
             name=name,
             product_url=product_url,
         )
+        audience = self._audience_from_url(product_url) or base.audience
+        if audience in {"men", "kids"}:
+            category = self._category_from_name(name) or category
         return ParsedProduct(
             source=base.source,
             source_product_id=base.source_product_id,
             name=name or base.name,
             brand=base.brand or "VikiSews",
+            audience=audience,
             category=category or base.category,
             subcategory=base.subcategory,
             price=price if price is not None else base.price,
@@ -303,6 +312,36 @@ class VikiSewsProvider(BaseProvider):
     def _category_from_url(cls, product_url: str) -> str | None:
         match = re.search(r"/vykrojki/([^/]+)/[^/]+/?$", product_url)
         return cls._category_by_slug.get(match.group(1)) if match else None
+
+    @staticmethod
+    def _audience_from_url(product_url: str) -> str | None:
+        if "/muzhskie-vykrojki/" in product_url:
+            return "men"
+        if "/detskie-vykrojki/" in product_url:
+            return "kids"
+        if "/vykrojki/" in product_url:
+            return "women"
+        return None
+
+    @staticmethod
+    def _category_from_name(name: str) -> str | None:
+        text = name.casefold().replace("ё", "е")
+        checks: tuple[tuple[tuple[str, ...], str], ...] = (
+            (("сарафан", "плать"), "Платья"),
+            (("брюк", "шорт", "джинс", "лосин", "леггинс"), "Брюки и шорты"),
+            (("юбк",), "Юбки"),
+            (("жакет", "жилет", "пиджак"), "Жакеты и жилеты"),
+            (("пальто", "куртк", "плащ", "тренч", "бомбер", "парка"), "Верхняя одежда"),
+            (("рубашк", "блузк", "топ", "майк", "водолазк", "боди"), "Рубашки, блузки и топы"),
+            (("худи", "свитшот", "футболк", "лонгслив", "джемпер", "свитер", "толстовк", "кардиган"), "Худи, футболки и лонгсливы"),
+            (("комбинезон", "полукомбинезон"), "Комбинезоны"),
+            (("халат", "пижам", "купальник", "бель", "трус"), "Бельё и домашняя одежда"),
+            (("панам", "шапк", "кепк", "сумк", "галстук", "тапк"), "Аксессуары"),
+        )
+        for markers, category in checks:
+            if any(marker in text for marker in markers):
+                return category
+        return "Другое"
 
     @staticmethod
     def _decimal(value: object) -> Decimal | None:

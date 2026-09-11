@@ -16,12 +16,14 @@ def product(
     source_product_id: str | None = "100",
     url: str = "https://vikisews.com/vykrojki/category/item/",
     price: str = "280",
+    audience: str | None = "women",
 ) -> ParsedProduct:
     return ParsedProduct(
         source=source,
         source_product_id=source_product_id,
         name="Платье Тест",
         brand="VikiSews",
+        audience=audience,
         product_url=url,
         price=Decimal(price),
         currency="RUB",
@@ -71,6 +73,27 @@ class ProductRepositoryTests(unittest.TestCase):
 
         self.assertEqual(self.repository.upsert_many([other_source]), (1, 0))
         self.assertEqual(self.repository.stats().products, 2)
+
+    def test_filters_by_audience_and_category(self) -> None:
+        self.repository.upsert_many(
+            [
+                product(source_product_id="1", audience="women"),
+                product(
+                    source_product_id="2",
+                    audience="men",
+                    url="https://vikisews.com/vykrojki/muzhskie/item/",
+                ),
+            ]
+        )
+
+        saved = self.repository.list_products(
+            filters=__import__("app.models.product", fromlist=["ProductFilter"]).ProductFilter(
+                audience="men"
+            )
+        )
+
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0].audience, "men")
 
 
 if __name__ == "__main__":

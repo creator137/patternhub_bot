@@ -10,6 +10,10 @@ from app.models.product import ParsedProduct
 class ProviderResult:
     products: list[ParsedProduct]
     errors: int = 0
+    skipped: int = 0
+    skipped_product_ids: tuple[str, ...] = ()
+    skipped_product_urls: tuple[str, ...] = ()
+    complete: bool = True
 
 
 class BaseProvider(ABC):

@@ -1,0 +1,9 @@
+[
+  {"id": 50, "name": "Женская одежда", "slug": "zhenskaya-odezhda", "parent": 0},
+  {"id": 49, "name": "Мужская одежда", "slug": "muzhskaya-odezhda", "parent": 0},
+  {"id": 61, "name": "Блузки, топы, рубашки", "slug": "bluzki-topi-rubashki", "parent": 50},
+  {"id": 60, "name": "Брюки и шорты", "slug": "bruki-shorti", "parent": 50},
+  {"id": 57, "name": "Платья и юбки", "slug": "platia-yubki", "parent": 50},
+  {"id": 59, "name": "Верхняя одежда", "slug": "verhnia-odejda", "parent": 50},
+  {"id": 62, "name": "Трикотаж", "slug": "trikotaj", "parent": 50}
+]

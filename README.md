@@ -1,13 +1,13 @@
 # PatternHub Bot
 
 Локальный MVP Telegram-бота-агрегатора выкроек. Бот работает через long polling,
-отвечает `Test` на команду `/start` и один раз сохраняет `chat_id` первого
+показывает каталог на команду `/start` и один раз сохраняет `chat_id` первого
 тестового пользователя в SQLite. Повторные запуски и команды `/start` от других
 пользователей выбранный `chat_id` не меняют.
 
 Основа общего каталога рассчитана на VikiSews, Grasser, HelperSew, Studio
-Yusupova и Sew It Now. Сейчас подключён только HTML-provider VikiSews; остальные
-источники зарегистрированы в БД, но отключены и не имеют parser-реализаций.
+Yusupova и SewItNow. Все пять источников подключены как отдельные providers и
+сохраняют товары в единую таблицу каталога.
 
 ## Требования
 
@@ -64,21 +64,28 @@ BOT_TOKEN=ваш_токен_от_BotFather
 python -m app
 ```
 
-Затем откройте бота в Telegram и отправьте `/start`. Бот ответит `Test`.
+Затем откройте бота в Telegram и отправьте `/start`. Бот покажет главное меню.
 Первый `chat_id` сохранится в `data/patternhub.sqlite3` и переживёт перезапуск.
 
 ## Каталог
 
-Запустить синхронизацию VikiSews:
+Запустить синхронизацию источника:
 
 ```bash
 python -m app parse vikisews
+python -m app parse grasser
+python -m app parse helpersew
+python -m app parse studio_yusupova
+python -m app parse sewitnow
 ```
 
-Provider читает публичные серверные HTML-страницы каталога с задержкой между
-запросами. Закрытый сайтом `/api/` не используется. Повторный запуск обновляет
-существующие позиции по паре `source + source_product_id`, а при отсутствии ID —
-по `source + product_url`; дубли не создаются.
+Providers читают публичные серверные HTML/JSON-данные каталога. Закрытые сайтом
+служебные endpoints не используются. Повторный запуск обновляет существующие
+позиции по паре `source + source_product_id`, а при отсутствии ID — по
+`source + product_url`; дубли не создаются. Если provider получил полный
+snapshot источника, товары, исчезнувшие из текущего полного импорта,
+помечаются `is_available = False` и пропадают из пользовательского каталога без
+удаления из SQLite.
 
 Статистика каталога:
 
@@ -94,11 +101,12 @@ python -m app products --limit 10
 
 Каталог и настройки находятся в одной SQLite БД `data/patternhub.sqlite3`.
 Основные товарные данные хранятся колонками таблицы `products`; списки размеров
-и ростов хранятся как JSON-текст. Из каталога VikiSews сейчас собираются ID
-источника, название, бренд, категория, URL, изображение, цена, старая цена,
-валюта и признаки скидки/бесплатности. Размеры, рост, сложность и описание
-доступны на детальных страницах, но массово не запрашиваются, чтобы не создавать
-сотни дополнительных запросов.
+и ростов хранятся как JSON-текст. Из каталогов сейчас собираются ID источника,
+название, бренд, нормализованная общая категория, URL, изображение, цена, старая
+цена, валюта, аудитория, доступность и признаки скидки/бесплатности/новинки.
+Размеры, рост, сложность и
+описание доступны на детальных страницах, но массово не запрашиваются, чтобы не
+создавать сотни дополнительных запросов.
 
 ## Управление тестовым chat_id
 
@@ -138,12 +146,18 @@ app/
 ├── config.py            # загрузка .env
 ├── database.py          # подключение и схема SQLite
 ├── models/
+│   ├── categories.py    # общий справочник нормализации категорий
 │   └── product.py       # общие ParsedProduct/Product и статистика
 ├── providers/
 │   ├── base.py          # общий контракт источника
 │   ├── registry.py      # реестр подключённых providers
-│   └── vikisews.py      # единственный source-specific модуль
+│   ├── grasser.py       # source-specific provider Grasser
+│   ├── helpersew.py     # source-specific provider HelperSew
+│   ├── sewitnow.py      # source-specific provider SewItNow
+│   ├── studio_yusupova.py
+│   └── vikisews.py      # source-specific provider VikiSews
 ├── handlers/
+│   ├── catalog.py       # Telegram UI общего каталога
 │   └── start.py         # обработчик /start
 ├── repositories/
 │   ├── products.py      # общий upsert и чтение каталога
@@ -156,6 +170,5 @@ tests/
 └── test_*.py
 ```
 
-Следующий этап: подключить каталог к Telegram UI. Остальные источники следует
-добавлять позднее отдельными provider-модулями через тот же `ParsedProduct`,
-`ProductRepository` и `CatalogService`.
+Новые источники следует добавлять отдельными provider-модулями через тот же
+`ParsedProduct`, `ProductRepository` и `CatalogService`.

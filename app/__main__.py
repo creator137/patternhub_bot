@@ -6,6 +6,8 @@ import logging
 
 from app.config import load_settings
 from app.database import Database
+from app.models.categories import category_name_by_code, normalize_category
+from app.providers.registry import available_providers
 from app.repositories.products import ProductRepository
 from app.repositories.settings import SettingsRepository
 
@@ -20,10 +22,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     set_parser.add_argument("chat_id", type=int)
     parse_parser = subparsers.add_parser("parse", help="synchronize a catalog source")
-    parse_parser.add_argument("source", choices=("vikisews",))
+    parse_parser.add_argument("source", choices=available_providers())
     subparsers.add_parser("catalog-stats", help="show catalog statistics")
     products_parser = subparsers.add_parser("products", help="show saved products")
     products_parser.add_argument("--limit", type=positive_int, default=10)
+    products_parser.add_argument("--audience", choices=("women", "men", "kids", "unisex"))
+    products_parser.add_argument("--category")
     return parser
 
 
@@ -73,15 +77,32 @@ def main() -> None:
         return
     if args.command == "catalog-stats":
         stats = product_repository().stats()
-        print(f"Products: {stats.products}")
+        print(f"Products total: {stats.total}")
+        print(f"Available: {stats.available}")
+        print(f"Unavailable: {stats.unavailable}")
         print("Sources:")
         for source, count in stats.by_source.items():
             print(f"  {source}: {count}")
+        if stats.unavailable_by_source:
+            print("Unavailable sources:")
+            for source, count in stats.unavailable_by_source.items():
+                print(f"  {source}: {count}")
         print(f"\nOn sale: {stats.on_sale}")
+        print(f"New: {stats.new}")
         print(f"Free: {stats.free}")
+        print(f"Categories: {stats.categories}")
+        print(f"No price: {stats.no_price}")
+        print(f"No image: {stats.no_image}")
+        print("\nAudience:")
+        for audience, count in stats.by_audience.items():
+            print(f"  {audience}: {count}")
         return
     if args.command == "products":
-        for product in product_repository().list_products(args.limit):
+        from app.models.product import ProductFilter
+
+        category = category_name_by_code(args.category) or normalize_category(args.category)
+        filters = ProductFilter(audience=args.audience, category=category)
+        for product in product_repository().list_products(args.limit, filters=filters):
             price = (
                 f"{product.price} {product.currency or ''}".strip()
                 if product.price is not None
@@ -90,7 +111,8 @@ def main() -> None:
             sizes = ", ".join(product.sizes) if product.sizes else "—"
             print(
                 f"[{product.id}] {product.name}\n"
-                f"  Price: {price}; Category: {product.category or '—'}; Sizes: {sizes}\n"
+                f"  Price: {price}; Audience: {product.audience or '—'}; "
+                f"Category: {product.category or '—'}; Sizes: {sizes}\n"
                 f"  {product.product_url}"
             )
         return
@@ -106,7 +128,9 @@ def main() -> None:
         )
         print(
             f"Source: {stats.source}\nFound: {stats.found}\nAdded: {stats.added}\n"
-            f"Updated: {stats.updated}\nErrors: {stats.errors}\n"
+            f"Updated: {stats.updated}\nSkipped: {stats.skipped}\n"
+            f"Marked unavailable: {stats.unavailable}\nErrors: {stats.errors}\n"
+            f"Complete: {stats.complete}\n"
             f"Duration: {stats.duration_seconds:.2f}s"
         )
         return
