@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from decimal import Decimal
@@ -183,6 +184,47 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         message.delete.assert_not_called()
         self.assertIn("4 / 4", str(message.answer_photo.await_args.kwargs["reply_markup"]))
+
+    async def test_repeated_next_click_is_ignored_while_card_is_loading(self) -> None:
+        category = (await self.service.get_categories(section="women"))[0]
+        message = SimpleNamespace(
+            answer_photo=AsyncMock(),
+            answer=AsyncMock(),
+            delete=AsyncMock(),
+            chat=SimpleNamespace(id=100),
+            message_id=200,
+        )
+        first_callback = SimpleNamespace(
+            message=message,
+            answer=AsyncMock(),
+            from_user=SimpleNamespace(id=300),
+        )
+        second_callback = SimpleNamespace(
+            message=message,
+            answer=AsyncMock(),
+            from_user=SimpleNamespace(id=300),
+        )
+        data = ProductCallback(
+            action="next", section="women", category=category.code, index=0
+        )
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_send(*args, **kwargs):
+            started.set()
+            await release.wait()
+
+        with patch("app.handlers.catalog.send_product_card", new=slow_send):
+            first_task = asyncio.create_task(
+                handle_product_callback(first_callback, self.service, data)
+            )
+            await started.wait()
+            await handle_product_callback(second_callback, self.service, data)
+            release.set()
+            await first_task
+
+        first_callback.answer.assert_awaited_once_with()
+        second_callback.answer.assert_awaited_once_with("Загружаю карточку...")
 
     async def test_product_without_image_uses_text_message(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
 import re
@@ -60,6 +61,8 @@ SECTION_BY_TEXT = {
     "🆕 Новинки": NEW_SECTION,
 }
 SECTION_TITLES = {value: key for key, value in SECTION_BY_TEXT.items()}
+ACTIVE_PRODUCT_CALLBACKS: set[tuple[object, ...]] = set()
+ACTIVE_PRODUCT_CALLBACKS_LOCK = asyncio.Lock()
 
 
 class SectionCallback(CallbackData, prefix="sec"):
@@ -224,6 +227,28 @@ async def handle_product_callback(
     catalog_service: CatalogService,
     callback_data: ProductCallback,
 ) -> None:
+    busy_key = product_callback_busy_key(callback, callback_data)
+    if callback_data.action in {"next", "prev"}:
+        async with ACTIVE_PRODUCT_CALLBACKS_LOCK:
+            if busy_key in ACTIVE_PRODUCT_CALLBACKS:
+                await callback.answer("Загружаю карточку...")
+                return
+            ACTIVE_PRODUCT_CALLBACKS.add(busy_key)
+        try:
+            await handle_product_callback_once(callback, catalog_service, callback_data)
+        finally:
+            async with ACTIVE_PRODUCT_CALLBACKS_LOCK:
+                ACTIVE_PRODUCT_CALLBACKS.discard(busy_key)
+        return
+
+    await handle_product_callback_once(callback, catalog_service, callback_data)
+
+
+async def handle_product_callback_once(
+    callback: CallbackQuery,
+    catalog_service: CatalogService,
+    callback_data: ProductCallback,
+) -> None:
     if callback_data.action == "back":
         await callback.answer()
         filters = section_filters(callback_data.section, callback_data.quick_filter)
@@ -284,6 +309,28 @@ async def handle_product_callback(
             next_index,
             quick_filter=callback_data.quick_filter,
         )
+
+
+def product_callback_busy_key(
+    callback: CallbackQuery,
+    callback_data: ProductCallback,
+) -> tuple[object, ...]:
+    user_id = getattr(getattr(callback, "from_user", None), "id", None)
+    message = getattr(callback, "message", None)
+    chat_id = getattr(getattr(message, "chat", None), "id", None)
+    message_id = getattr(message, "message_id", None)
+    if user_id is None:
+        user_id = "unknown-user"
+    if chat_id is None:
+        chat_id = id(message)
+    return (
+        user_id,
+        chat_id,
+        message_id,
+        callback_data.section,
+        callback_data.category,
+        callback_data.quick_filter,
+    )
 
 
 async def send_product_card(
