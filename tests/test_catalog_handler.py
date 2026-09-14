@@ -5,8 +5,9 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
+from aiogram.exceptions import TelegramAPIError
 from app.database import Database
 from app.handlers.catalog import (
     CategoryCallback,
@@ -193,6 +194,45 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         await send_product_card(message, self.service, "women", category.code, 2)
 
         message.answer_photo.assert_not_awaited()
+        message.answer.assert_awaited_once()
+
+    async def test_product_image_falls_back_to_downloaded_file(self) -> None:
+        category = (await self.service.get_categories(section="women"))[0]
+        error = TelegramAPIError(method=SimpleNamespace(), message="failed")
+        message = SimpleNamespace(
+            answer_photo=AsyncMock(side_effect=[error, None]),
+            answer=AsyncMock(),
+            delete=AsyncMock(),
+        )
+        photo_file = object()
+
+        with patch(
+            "app.handlers.catalog.download_product_photo",
+            new=AsyncMock(return_value=photo_file),
+        ) as download:
+            await send_product_card(message, self.service, "women", category.code, 0)
+
+        download.assert_awaited_once()
+        self.assertEqual(message.answer_photo.await_count, 2)
+        self.assertIs(message.answer_photo.await_args.kwargs["photo"], photo_file)
+        message.answer.assert_not_awaited()
+
+    async def test_product_image_falls_back_to_text_after_download_failure(self) -> None:
+        category = (await self.service.get_categories(section="women"))[0]
+        error = TelegramAPIError(method=SimpleNamespace(), message="failed")
+        message = SimpleNamespace(
+            answer_photo=AsyncMock(side_effect=error),
+            answer=AsyncMock(),
+            delete=AsyncMock(),
+        )
+
+        with patch(
+            "app.handlers.catalog.download_product_photo",
+            new=AsyncMock(return_value=None),
+        ):
+            await send_product_card(message, self.service, "women", category.code, 0)
+
+        message.answer_photo.assert_awaited_once()
         message.answer.assert_awaited_once()
 
     async def test_product_without_price_has_consistent_text(self) -> None:

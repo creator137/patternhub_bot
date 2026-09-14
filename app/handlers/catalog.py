@@ -6,10 +6,12 @@ import re
 from decimal import Decimal
 from urllib.parse import quote, urlsplit, urlunsplit
 
+import httpx
 from aiogram import F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import (
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -37,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 HOME_TEXT = "🏠 Главное меню"
 DETAILS_DESCRIPTION_LIMIT = 420
+IMAGE_DOWNLOAD_TIMEOUT = 15.0
+MAX_IMAGE_DOWNLOAD_BYTES = 10 * 1024 * 1024
 FILTER_ALL = "all"
 FILTER_BEGINNER = "beg"
 FILTER_KNIT = "knit"
@@ -340,7 +344,26 @@ async def send_product_card(
             )
             return
         except TelegramAPIError:
-            logger.info("Telegram could not send product image: product_id=%s", product.id)
+            logger.info(
+                "Telegram could not send product image by URL: product_id=%s",
+                product.id,
+            )
+
+        photo_file = await download_product_photo(product.image_url, product.id)
+        if photo_file is not None:
+            try:
+                await message.answer_photo(
+                    photo=photo_file,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                return
+            except TelegramAPIError:
+                logger.info(
+                    "Telegram could not send downloaded product image: product_id=%s",
+                    product.id,
+                )
 
     await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -544,6 +567,48 @@ def telegram_photo_url(image_url: str) -> str:
             "",
         )
     )
+
+
+async def download_product_photo(
+    image_url: str,
+    product_id: int | None = None,
+) -> BufferedInputFile | None:
+    url = telegram_photo_url(image_url)
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=IMAGE_DOWNLOAD_TIMEOUT,
+            trust_env=False,
+            headers={"User-Agent": "Mozilla/5.0"},
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+    except httpx.HTTPError:
+        logger.info("Could not download product image: product_id=%s", product_id)
+        return None
+
+    content = response.content
+    if not content or len(content) > MAX_IMAGE_DOWNLOAD_BYTES:
+        logger.info(
+            "Downloaded product image has unsupported size: product_id=%s size=%s",
+            product_id,
+            len(content),
+        )
+        return None
+
+    content_type = response.headers.get("content-type", "").lower()
+    if "image" not in content_type and content_type != "application/octet-stream":
+        logger.info(
+            "Downloaded product image has unsupported content type: product_id=%s type=%s",
+            product_id,
+            content_type,
+        )
+        return None
+
+    filename = urlsplit(url).path.rsplit("/", 1)[-1] or "product-image.jpg"
+    if "." not in filename:
+        filename = f"{filename}.jpg"
+    return BufferedInputFile(content, filename=filename)
 
 
 def compact_range(values: tuple[str, ...]) -> str:
