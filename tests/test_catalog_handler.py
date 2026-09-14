@@ -491,6 +491,16 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("🆕 Новинка", text)
 
+    async def test_product_card_shows_quick_filter_badges(self) -> None:
+        saved = await self.service.get_products(
+            filters=ProductFilter(is_beginner=True, is_knit=True)
+        )
+
+        text = format_product_card(saved[0])
+
+        self.assertIn("⭐ Для начинающих", text)
+        self.assertIn("🧵 Трикотаж", text)
+
     async def test_product_details_truncates_long_description(self) -> None:
         self.repository.upsert_many(
             [
