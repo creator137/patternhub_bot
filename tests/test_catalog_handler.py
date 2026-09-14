@@ -100,7 +100,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
                     source_product_id="6",
                     audience="women",
                     difficulty="Для начинающих",
-                    description="Выкройка из трикотажа",
+                    subcategory="Футболки из трикотажа",
                 ),
                 ParsedProduct(
                     source="grasser",

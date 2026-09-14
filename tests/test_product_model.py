@@ -80,6 +80,18 @@ class ParsedProductTests(unittest.TestCase):
 
         self.assertTrue(product.is_knit)
 
+    def test_technical_knit_mention_does_not_mark_product_as_knit(self) -> None:
+        product = ParsedProduct(
+            source="studio_yusupova",
+            name="Брюки из костюмной ткани",
+            product_url="https://studio-yusupova.ru/shop/pants/",
+            category="Брюки и шорты",
+            subcategory="Брюки",
+            description="Для пояса подойдет дублерин на трикотажной основе.",
+        ).normalized()
+
+        self.assertFalse(product.is_knit)
+
 
 if __name__ == "__main__":
     unittest.main()

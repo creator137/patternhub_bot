@@ -155,7 +155,7 @@ class ProductRepositoryTests(unittest.TestCase):
                 product(
                     source_product_id="2",
                     category="Худи, футболки и лонгсливы",
-                    description="Выкройка из трикотажа",
+                    subcategory="Футболки из трикотажа",
                     url="https://vikisews.com/vykrojki/knit/item/",
                 ),
             ]

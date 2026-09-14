@@ -103,10 +103,7 @@ class ParsedProduct:
         is_beginner = self.is_beginner or _has_beginner_marker(
             (difficulty, description, name, subcategory)
         )
-        is_knit = self.is_knit or _has_text_marker(
-            (category, subcategory, description, name),
-            ("трикотаж",),
-        )
+        is_knit = self.is_knit or _has_text_marker((subcategory,), ("трикотаж",))
         return replace(
             self,
             source=source,
