@@ -648,6 +648,8 @@ def format_product_card(product: Product) -> str:
         "",
         format_price(product),
         f"📂 {html.escape(product.category)}" if product.category else None,
+        "⭐ Для начинающих" if product.is_beginner else None,
+        "🧵 Трикотаж" if product.is_knit else None,
         format_values("📐 Размеры", product.sizes),
         format_values("📏 Рост", product.heights),
     ]

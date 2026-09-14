@@ -166,8 +166,8 @@ class VikiSewsProvider(BaseProvider):
             is_sale=product.is_sale,
             is_free=product.is_free,
             is_new=product.is_new,
-            is_beginner=product.is_beginner,
-            is_knit=product.is_knit,
+            is_beginner=False,
+            is_knit=False,
             sizes=product.sizes,
             heights=product.heights,
             difficulty=product.difficulty,
@@ -358,7 +358,7 @@ class VikiSewsProvider(BaseProvider):
             is_free=base.is_free,
             is_new=base.is_new,
             is_beginner=base.is_beginner,
-            is_knit=base.is_knit or is_knit,
+            is_knit=is_knit,
             sizes=sizes or base.sizes,
             heights=heights or base.heights,
             difficulty=(
@@ -385,7 +385,7 @@ class VikiSewsProvider(BaseProvider):
             is_free=existing.is_free or product.is_free,
             is_new=existing.is_new or product.is_new,
             is_beginner=existing.is_beginner or product.is_beginner,
-            is_knit=existing.is_knit or product.is_knit,
+            is_knit=product.is_knit,
             image_url=product.image_url or existing.image_url,
             is_available=existing.is_available or product.is_available,
         ).normalized()
