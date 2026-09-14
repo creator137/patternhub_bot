@@ -101,6 +101,9 @@ class HelperSewProviderTests(unittest.TestCase):
 
         self.assertTrue(merged.is_beginner)
 
+    def test_uses_request_delay_for_large_catalog_crawls(self) -> None:
+        self.assertGreater(self.provider.request_delay, 0)
+
     def test_parses_optional_detail_fields(self) -> None:
         html = (FIXTURES / "helpersew_product.html").read_text(encoding="utf-8")
 

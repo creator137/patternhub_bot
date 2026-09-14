@@ -6,6 +6,7 @@ import logging
 import re
 from dataclasses import replace
 from decimal import Decimal, InvalidOperation
+from time import monotonic
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -113,14 +114,17 @@ class HelperSewProvider(BaseProvider):
         *,
         timeout: float = 40.0,
         retries: int = 3,
+        request_delay: float = 0.8,
         max_categories: int | None = None,
     ) -> None:
         self.timeout = timeout
         self.retries = retries
+        self.request_delay = request_delay
         self.max_categories = max_categories
         self.requests_made = 0
         self.retries_made = 0
         self.last_skipped = 0
+        self._last_request_started: float | None = None
 
     async def fetch_products(self) -> ProviderResult:
         products_by_key: dict[str, ParsedProduct] = {}
@@ -193,6 +197,10 @@ class HelperSewProvider(BaseProvider):
 
     async def _get_page(self, client: httpx.AsyncClient, url: str) -> str | None:
         for attempt in range(1, self.retries + 1):
+            if self._last_request_started is not None:
+                elapsed = monotonic() - self._last_request_started
+                await asyncio.sleep(max(0.0, self.request_delay - elapsed))
+            self._last_request_started = monotonic()
             self.requests_made += 1
             try:
                 response = await client.get(url)
