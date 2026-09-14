@@ -22,6 +22,7 @@ from app.handlers.catalog import (
     product_keyboard,
     product_filters,
     product_photo_file_id,
+    quick_filter_button_text,
     send_product_card,
     show_brands,
     show_main_menu,
@@ -397,8 +398,8 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         await show_section(message, self.service, "women")
 
         keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
-        self.assertIn("Для начинающих", keyboard_text)
-        self.assertIn("Из трикотажа", keyboard_text)
+        self.assertIn("Для начинающих (1)", keyboard_text)
+        self.assertIn("Из трикотажа (1)", keyboard_text)
 
     async def test_knit_filter_limits_categories(self) -> None:
         message = SimpleNamespace(answer=AsyncMock())
@@ -407,6 +408,24 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         text = str(message.answer.await_args.kwargs["reply_markup"])
         self.assertIn("Худи, футболки и лонгсливы", text)
+
+    async def test_empty_fast_filter_keeps_navigation_buttons(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_section(message, self.service, "kids", "beg")
+
+        text = message.answer.await_args.args[0]
+        keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("Сейчас товаров в этом фильтре нет.", text)
+        self.assertIn("✓ Для начинающих (0)", keyboard_text)
+        self.assertIn("Все (1)", keyboard_text)
+        self.assertIn("Назад", keyboard_text)
+
+    def test_quick_filter_button_text_shows_count(self) -> None:
+        self.assertEqual(
+            quick_filter_button_text("beg", "Для начинающих", "beg", {"beg": 7}),
+            "✓ Для начинающих (7)",
+        )
 
     async def test_product_card_shows_new_badge(self) -> None:
         self.repository.upsert_many(

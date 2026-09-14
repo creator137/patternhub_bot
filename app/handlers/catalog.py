@@ -123,19 +123,21 @@ async def show_section(
 
     filters = section_filters(section, quick_filter)
     categories = await catalog_service.get_categories(filters=filters)
-    if not categories:
-        await message.answer("Сейчас товаров в этом разделе нет.")
-        return
-
     title = await section_title(catalog_service, section)
     filter_title = (
         f"\nФильтр: {QUICK_FILTER_TITLES[quick_filter]}"
         if section in AUDIENCE_SECTIONS and quick_filter != FILTER_ALL
         else ""
     )
+    quick_counts = await quick_filter_counts(catalog_service, section)
+    text = (
+        f"{title}{filter_title}\n\nВыберите категорию:"
+        if categories
+        else f"{title}{filter_title}\n\nСейчас товаров в этом фильтре нет."
+    )
     await message.answer(
-        f"{title}{filter_title}\n\nВыберите категорию:",
-        reply_markup=categories_keyboard(section, categories, quick_filter),
+        text,
+        reply_markup=categories_keyboard(section, categories, quick_filter, quick_counts),
     )
 
 
@@ -167,13 +169,14 @@ def categories_keyboard(
     section: str,
     categories: list[CatalogCategory],
     quick_filter: str = FILTER_ALL,
+    quick_counts: dict[str, int] | None = None,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if section in AUDIENCE_SECTIONS:
         rows.extend(
             [
                 InlineKeyboardButton(
-                    text=f"{'✓ ' if quick_filter == code else ''}{title}",
+                    text=quick_filter_button_text(code, title, quick_filter, quick_counts),
                     callback_data=SectionFilterCallback(
                         section=section,
                         quick_filter=code,
@@ -199,6 +202,29 @@ def categories_keyboard(
     return InlineKeyboardMarkup(
         inline_keyboard=rows
     )
+
+
+async def quick_filter_counts(
+    catalog_service: CatalogService,
+    section: str,
+) -> dict[str, int]:
+    if section not in AUDIENCE_SECTIONS:
+        return {}
+    return {
+        code: await catalog_service.count_products(section_filters(section, code))
+        for code in QUICK_FILTER_TITLES
+    }
+
+
+def quick_filter_button_text(
+    code: str,
+    title: str,
+    selected: str,
+    counts: dict[str, int] | None = None,
+) -> str:
+    prefix = "✓ " if selected == code else ""
+    suffix = f" ({counts[code]})" if counts and code in counts else ""
+    return f"{prefix}{title}{suffix}"
 
 
 class SectionFilterCallback(CallbackData, prefix="flt"):
