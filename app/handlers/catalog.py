@@ -821,6 +821,16 @@ def create_catalog_router(catalog_service: CatalogService) -> Router:
     async def bound_section_filter(
         callback: CallbackQuery, callback_data: SectionFilterCallback
     ) -> None:
+        total = await catalog_service.count_products(
+            section_filters(callback_data.section, callback_data.quick_filter)
+        )
+        if total == 0:
+            await safe_callback_answer(
+                callback,
+                "Пока нет товаров по этому фильтру.",
+                show_alert=True,
+            )
+            return
         await safe_callback_answer(callback)
         if callback.message:
             await show_section(

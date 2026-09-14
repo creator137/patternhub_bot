@@ -15,6 +15,7 @@ from app.handlers.catalog import (
     ProductCallback,
     SectionCallback,
     SectionFilterCallback,
+    create_catalog_router,
     compact_range,
     format_product_details,
     format_product_card,
@@ -455,6 +456,24 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("✓ Для начинающих (0)", keyboard_text)
         self.assertIn("Все (1)", keyboard_text)
         self.assertIn("Назад", keyboard_text)
+
+    async def test_empty_fast_filter_callback_shows_alert(self) -> None:
+        router = create_catalog_router(self.service)
+        handler = next(
+            item
+            for item in router.callback_query.handlers
+            if getattr(item.callback, "__name__", "") == "bound_section_filter"
+        )
+        callback = SimpleNamespace(message=SimpleNamespace(answer=AsyncMock()), answer=AsyncMock())
+        data = SectionFilterCallback(section="kids", quick_filter="beg")
+
+        await handler.callback(callback, data)
+
+        callback.answer.assert_awaited_once_with(
+            "Пока нет товаров по этому фильтру.",
+            show_alert=True,
+        )
+        callback.message.answer.assert_not_awaited()
 
     def test_quick_filter_button_text_shows_count(self) -> None:
         self.assertEqual(
