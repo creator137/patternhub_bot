@@ -70,6 +70,39 @@ class SewItNowProviderTests(unittest.TestCase):
             self.provider.catalog_data_url("build-id", "platya-i-kombinezony-5503"),
             "https://sewitnow.ru/_next/data/build-id/catalog/platya-i-kombinezony-5503.json",
         )
+        self.assertEqual(
+            self.provider.catalog_data_url(
+                "build-id",
+                "platya-i-kombinezony-5503/kombinezony-33038",
+            ),
+            (
+                "https://sewitnow.ru/_next/data/build-id/catalog/"
+                "platya-i-kombinezony-5503/kombinezony-33038.json"
+            ),
+        )
+
+    def test_catalog_pages_include_nested_categories(self) -> None:
+        pages = self.provider.catalog_pages(self.groups)
+
+        self.assertIn(
+            SewItNowCategoryContext(
+                id="33038",
+                name="Комбинезоны",
+                slug="kombinezony-33038",
+                parent_name="Платья и комбинезоны",
+                parent_id="5503",
+                parent_slug="platya-i-kombinezony-5503",
+            ),
+            pages,
+        )
+        nested = next(page for page in pages if page.id == "33038")
+        self.assertEqual(
+            self.provider.catalog_context_data_url("build-id", nested),
+            (
+                "https://sewitnow.ru/_next/data/build-id/catalog/"
+                "platya-i-kombinezony-5503/kombinezony-33038.json"
+            ),
+        )
 
     def test_incomplete_snapshot_detected_from_payload_pages(self) -> None:
         self.provider.parse_catalog_payload(

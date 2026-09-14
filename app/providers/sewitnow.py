@@ -26,6 +26,8 @@ class SewItNowCategoryContext:
     name: str
     slug: str
     parent_name: str | None = None
+    parent_id: str | None = None
+    parent_slug: str | None = None
 
     @property
     def is_special(self) -> bool:
@@ -134,7 +136,7 @@ class SewItNowProvider(BaseProvider):
                 pages = pages[: self.max_groups]
 
             for page_context in pages:
-                page_url = self.catalog_data_url(build_id, page_context.slug)
+                page_url = self.catalog_context_data_url(build_id, page_context)
                 payload = await self._get_json(client, page_url)
                 if not isinstance(payload, dict):
                     errors += 1
@@ -205,8 +207,17 @@ class SewItNowProvider(BaseProvider):
             return None
 
     def catalog_data_url(self, build_id: str, slug: str) -> str:
-        safe_slug = quote(slug.strip("/"), safe="")
+        safe_slug = quote(slug.strip("/"), safe="/")
         return f"{self.base_url}/_next/data/{build_id}/catalog/{safe_slug}.json"
+
+    def catalog_context_data_url(
+        self,
+        build_id: str,
+        context: SewItNowCategoryContext,
+    ) -> str:
+        if context.parent_slug:
+            return self.catalog_data_url(build_id, f"{context.parent_slug}/{context.slug}")
+        return self.catalog_data_url(build_id, context.slug)
 
     @classmethod
     def parse_next_data(cls, html: str) -> dict[str, Any]:
@@ -227,20 +238,41 @@ class SewItNowProvider(BaseProvider):
     @staticmethod
     def catalog_pages(groups: list[dict[str, Any]]) -> list[SewItNowCategoryContext]:
         pages: list[SewItNowCategoryContext] = []
+        seen: set[tuple[str, str | None]] = set()
         for group in groups:
             group_id = str(group.get("id") or "")
             group_slug = str(group.get("slug") or group_id)
             group_name = str(group.get("name") or "")
             if not group_id or not group_slug or not group_name:
                 continue
-            pages.append(
-                SewItNowCategoryContext(
-                    id=group_id,
-                    name=group_name,
-                    slug=group_slug,
-                    parent_name=None,
-                )
+            group_context = SewItNowCategoryContext(
+                id=group_id,
+                name=group_name,
+                slug=group_slug,
+                parent_name=None,
             )
+            pages.append(group_context)
+            seen.add((group_context.id, group_context.parent_id))
+            for category in group.get("categories") or []:
+                if not isinstance(category, dict):
+                    continue
+                category_id = str(category.get("id") or "")
+                category_slug = str(category.get("slug") or category_id)
+                category_name = str(category.get("name") or "")
+                key = (category_id, group_id)
+                if not category_id or not category_slug or not category_name or key in seen:
+                    continue
+                pages.append(
+                    SewItNowCategoryContext(
+                        id=category_id,
+                        name=category_name,
+                        slug=category_slug,
+                        parent_name=group_name,
+                        parent_id=group_id,
+                        parent_slug=group_slug,
+                    )
+                )
+                seen.add(key)
         return pages
 
     @staticmethod
@@ -271,6 +303,8 @@ class SewItNowProvider(BaseProvider):
                         name=category_name,
                         slug=category_slug,
                         parent_name=group_name,
+                        parent_id=group_id or None,
+                        parent_slug=group_slug or None,
                     )
         return index
 
