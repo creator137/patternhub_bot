@@ -52,6 +52,51 @@ class GrasserProviderTests(unittest.TestCase):
 
         self.assertEqual(self.provider.next_page_number(html), 2)
 
+    def test_parses_quick_filter_listing_flags(self) -> None:
+        html = (FIXTURES / "grasser_catalog.html").read_text(encoding="utf-8")
+
+        beginner = self.provider.parse_catalog_page(
+            html,
+            self.provider.catalog_url,
+            page_is_beginner=True,
+        )
+        knit = self.provider.parse_catalog_page(
+            html,
+            self.provider.catalog_url,
+            page_is_knit=True,
+        )
+
+        self.assertTrue(all(product.is_beginner for product in beginner))
+        self.assertTrue(all(product.is_knit for product in knit))
+
+    def test_duplicate_quick_filter_flags_are_merged(self) -> None:
+        plain = ParsedProduct(
+            source="grasser",
+            source_product_id="153947",
+            name="Свитер, выкройка №1380",
+            brand="Grasser",
+            audience="women",
+            category="Худи, футболки и лонгсливы",
+            product_url="https://grasser.ru/vykrojki/vse-vykrojki/sviter-vykroyka-1380/",
+        ).normalized()
+        flagged = ParsedProduct(
+            source="grasser",
+            source_product_id="153947",
+            name="Свитер, выкройка №1380",
+            brand="Grasser",
+            audience="women",
+            category="Свитер",
+            product_url="https://grasser.ru/vykrojki/vse-vykrojki/sviter-vykroyka-1380/",
+            is_beginner=True,
+            is_knit=True,
+        ).normalized()
+
+        merged = self.provider._merge_product(plain, flagged)
+
+        self.assertEqual(merged.category, "Худи, футболки и лонгсливы")
+        self.assertTrue(merged.is_beginner)
+        self.assertTrue(merged.is_knit)
+
     def test_parses_optional_detail_fields(self) -> None:
         html = (FIXTURES / "grasser_product.html").read_text(encoding="utf-8")
 

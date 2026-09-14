@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from time import monotonic
 from urllib.parse import urljoin
@@ -22,6 +23,13 @@ class GrasserProvider(BaseProvider):
     source = "grasser"
     base_url = "https://grasser.ru"
     catalog_url = f"{base_url}/vykrojki/"
+    quick_filter_pages = (
+        ("vykroyki-dlya-nachinayushchikh", True, False),
+        ("zhenskie-vykroyki-dlya-nachinayushchikh", True, False),
+        ("muzhskie-vykroyki-dlya-nachinayushchikh", True, False),
+        ("detskie-vykroyki-dlya-nachinayushchikh", True, False),
+        ("shem-iz-trikotazha", False, True),
+    )
 
     def __init__(
         self,
@@ -56,47 +64,44 @@ class GrasserProvider(BaseProvider):
         async with httpx.AsyncClient(
             headers=headers, timeout=timeout, follow_redirects=True, trust_env=False
         ) as client:
-            page_number = 1
-            while page_number <= self.max_pages:
-                page_url = self.page_url(page_number)
-                html = await self._get_page(client, page_url)
-                if html is None:
-                    errors += 1
-                    break
+            (
+                catalog_errors,
+                catalog_skipped,
+                catalog_skipped_ids,
+                catalog_skipped_urls,
+            ) = await self._fetch_catalog_section(
+                client,
+                self.catalog_url,
+                products_by_key,
+                page_is_beginner=False,
+                page_is_knit=False,
+                stop_on_duplicates=True,
+            )
+            errors += catalog_errors
+            skipped += catalog_skipped
+            skipped_product_ids.update(catalog_skipped_ids)
+            skipped_product_urls.update(catalog_skipped_urls)
 
-                try:
-                    page_products = self.parse_catalog_page(html, page_url)
-                    skipped += self.last_skipped
-                    skipped_product_ids.update(self.last_skipped_product_ids)
-                    skipped_product_urls.update(self.last_skipped_product_urls)
-                except Exception as error:  # noqa: BLE001 - keep one bad page isolated
-                    errors += 1
-                    logger.exception("Could not parse Grasser catalog page %s: %s", page_url, error)
-                    break
-
-                new_count = 0
-                for product in page_products:
-                    key = product.source_product_id or product.product_url
-                    if key not in products_by_key:
-                        new_count += 1
-                    products_by_key[key] = product
-
-                logger.info(
-                    "Grasser catalog page %d: parsed=%d new=%d",
-                    page_number,
-                    len(page_products),
-                    new_count,
-                )
-                if not page_products or new_count == 0:
-                    break
-
-                next_page = self.next_page_number(html, page_number)
-                if next_page is None:
-                    break
-                page_number = next_page
-            else:
-                logger.warning("Grasser parser reached max_pages=%d", self.max_pages)
-                errors += 1
+            if catalog_errors == 0:
+                for slug, is_beginner, is_knit in self.quick_filter_pages:
+                    section_url = urljoin(self.catalog_url, f"{slug}/")
+                    (
+                        section_errors,
+                        section_skipped,
+                        section_skipped_ids,
+                        section_skipped_urls,
+                    ) = await self._fetch_catalog_section(
+                        client,
+                        section_url,
+                        products_by_key,
+                        page_is_beginner=is_beginner,
+                        page_is_knit=is_knit,
+                        stop_on_duplicates=False,
+                    )
+                    errors += section_errors
+                    skipped += section_skipped
+                    skipped_product_ids.update(section_skipped_ids)
+                    skipped_product_urls.update(section_skipped_urls)
 
         return ProviderResult(
             list(products_by_key.values()),
@@ -107,10 +112,83 @@ class GrasserProvider(BaseProvider):
             complete=errors == 0,
         )
 
-    def page_url(self, page_number: int) -> str:
+    async def _fetch_catalog_section(
+        self,
+        client: httpx.AsyncClient,
+        section_url: str,
+        products_by_key: dict[str, ParsedProduct],
+        *,
+        page_is_beginner: bool,
+        page_is_knit: bool,
+        stop_on_duplicates: bool,
+    ) -> tuple[int, int, set[str], set[str]]:
+        errors = 0
+        skipped = 0
+        skipped_product_ids: set[str] = set()
+        skipped_product_urls: set[str] = set()
+        page_number = 1
+        while page_number <= self.max_pages:
+            page_url = self.page_url(page_number, section_url)
+            html = await self._get_page(client, page_url)
+            if html is None:
+                errors += 1
+                break
+
+            try:
+                page_products = self.parse_catalog_page(
+                    html,
+                    page_url,
+                    page_is_beginner=page_is_beginner,
+                    page_is_knit=page_is_knit,
+                )
+                skipped += self.last_skipped
+                skipped_product_ids.update(self.last_skipped_product_ids)
+                skipped_product_urls.update(self.last_skipped_product_urls)
+            except Exception as error:  # noqa: BLE001 - keep one bad page isolated
+                errors += 1
+                logger.exception("Could not parse Grasser catalog page %s: %s", page_url, error)
+                break
+
+            new_count = 0
+            for product in page_products:
+                key = product.source_product_id or product.product_url
+                existing = products_by_key.get(key)
+                if existing is None:
+                    new_count += 1
+                    products_by_key[key] = product
+                else:
+                    products_by_key[key] = self._merge_product(existing, product)
+
+            logger.info(
+                "Grasser catalog section %s page %d: parsed=%d new=%d beginner=%s knit=%s",
+                section_url,
+                page_number,
+                len(page_products),
+                new_count,
+                page_is_beginner,
+                page_is_knit,
+            )
+            if not page_products or (stop_on_duplicates and new_count == 0):
+                break
+
+            next_page = self.next_page_number(html, page_number)
+            if next_page is None:
+                break
+            page_number = next_page
+        else:
+            logger.warning(
+                "Grasser parser reached max_pages=%d for %s",
+                self.max_pages,
+                section_url,
+            )
+            errors += 1
+        return errors, skipped, skipped_product_ids, skipped_product_urls
+
+    def page_url(self, page_number: int, section_url: str | None = None) -> str:
+        base_url = section_url or self.catalog_url
         if page_number <= 1:
-            return self.catalog_url
-        return f"{self.catalog_url}?PAGEN_3={page_number}"
+            return base_url
+        return f"{base_url}?PAGEN_3={page_number}"
 
     async def _get_page(
         self, client: httpx.AsyncClient, url: str
@@ -134,7 +212,14 @@ class GrasserProvider(BaseProvider):
                     await asyncio.sleep(float(attempt))
         return None
 
-    def parse_catalog_page(self, html: str, page_url: str) -> list[ParsedProduct]:
+    def parse_catalog_page(
+        self,
+        html: str,
+        page_url: str,
+        *,
+        page_is_beginner: bool = False,
+        page_is_knit: bool = False,
+    ) -> list[ParsedProduct]:
         soup = BeautifulSoup(html, "html.parser")
         products: list[ParsedProduct] = []
         seen: set[str] = set()
@@ -158,8 +243,27 @@ class GrasserProvider(BaseProvider):
             if key in seen:
                 continue
             seen.add(key)
+            product = replace(
+                product,
+                is_beginner=product.is_beginner or page_is_beginner,
+                is_knit=product.is_knit or page_is_knit,
+            ).normalized()
             products.append(product)
         return products
+
+    @staticmethod
+    def _merge_product(existing: ParsedProduct, product: ParsedProduct) -> ParsedProduct:
+        return replace(
+            existing,
+            old_price=product.old_price or existing.old_price,
+            is_sale=existing.is_sale or product.is_sale,
+            is_free=existing.is_free or product.is_free,
+            is_new=existing.is_new or product.is_new,
+            is_beginner=existing.is_beginner or product.is_beginner,
+            is_knit=existing.is_knit or product.is_knit,
+            image_url=existing.image_url or product.image_url,
+            is_available=existing.is_available or product.is_available,
+        ).normalized()
 
     def _parse_card(self, card: Tag, page_url: str) -> ParsedProduct:
         title_node = card.select_one(".catalog-block__title[href]")
