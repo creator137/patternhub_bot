@@ -9,7 +9,14 @@ from typing import Iterable
 from app.database import Database
 from app.models.audience import AUDIENCES
 from app.models.categories import category_code, category_name_by_code
-from app.models.product import CatalogCategory, CatalogStats, ParsedProduct, Product, ProductFilter
+from app.models.product import (
+    CatalogBrand,
+    CatalogCategory,
+    CatalogStats,
+    ParsedProduct,
+    Product,
+    ProductFilter,
+)
 
 
 class ProductRepository:
@@ -60,6 +67,30 @@ class ProductRepository:
             CatalogCategory(
                 code=self.category_code(row["category"]),
                 name=row["category"],
+                products=row["count"],
+            )
+            for row in rows
+        ]
+
+    def list_brands(self, filters: ProductFilter | None = None) -> list[CatalogBrand]:
+        where, parameters = self._where(filters)
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT source,
+                       COALESCE(NULLIF(TRIM(brand), ''), source) AS brand_name,
+                       COUNT(*) AS count
+                FROM products
+                {where}
+                GROUP BY source, brand_name
+                ORDER BY brand_name
+                """,
+                parameters,
+            ).fetchall()
+        return [
+            CatalogBrand(
+                source=row["source"],
+                name=row["brand_name"],
                 products=row["count"],
             )
             for row in rows
@@ -273,7 +304,43 @@ class ProductRepository:
             if filters.is_new is not None:
                 clauses.append("is_new = ?")
                 parameters.append(int(filters.is_new))
+            if filters.is_beginner is not None:
+                beginner_clause, beginner_parameters = ProductRepository._text_filter_clause(
+                    (
+                        "difficulty",
+                        "description",
+                        "name",
+                        "subcategory",
+                    ),
+                    ("начинающ", "легк", "простой", "простая"),
+                )
+                clauses.append(beginner_clause if filters.is_beginner else f"NOT ({beginner_clause})")
+                parameters.extend(beginner_parameters)
+            if filters.is_knit is not None:
+                knit_clause, knit_parameters = ProductRepository._text_filter_clause(
+                    (
+                        "category",
+                        "subcategory",
+                        "description",
+                        "name",
+                    ),
+                    ("трикотаж",),
+                )
+                clauses.append(knit_clause if filters.is_knit else f"NOT ({knit_clause})")
+                parameters.extend(knit_parameters)
         return f"WHERE {' AND '.join(clauses)}", tuple(parameters)
+
+    @staticmethod
+    def _text_filter_clause(
+        columns: tuple[str, ...], markers: tuple[str, ...]
+    ) -> tuple[str, tuple[str, ...]]:
+        parts: list[str] = []
+        parameters: list[str] = []
+        for column in columns:
+            for marker in markers:
+                parts.append(f"COALESCE({column}, '') LIKE ?")
+                parameters.append(f"%{marker}%")
+        return f"({' OR '.join(parts)})", tuple(parameters)
 
     @staticmethod
     def _find_existing_id(

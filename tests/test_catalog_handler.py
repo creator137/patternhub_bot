@@ -11,12 +11,18 @@ from app.database import Database
 from app.handlers.catalog import (
     CategoryCallback,
     ProductCallback,
+    SectionCallback,
+    SectionFilterCallback,
     compact_range,
     format_product_details,
     format_product_card,
     handle_product_callback,
+    product_keyboard,
     product_filters,
     send_product_card,
+    show_brands,
+    show_main_menu,
+    show_section,
     telegram_photo_url,
 )
 from app.models.product import ParsedProduct, ProductFilter
@@ -33,6 +39,9 @@ def product(
     image_url: str | None = "https://example.com/item.jpg",
     is_new: bool = False,
     audience: str | None = "women",
+    description: str | None = None,
+    difficulty: str | None = None,
+    subcategory: str | None = None,
 ) -> ParsedProduct:
     return ParsedProduct(
         source="vikisews",
@@ -41,11 +50,14 @@ def product(
         brand="VikiSews",
         audience=audience,
         category=category,
+        subcategory=subcategory,
         price=Decimal(price) if price is not None else None,
         currency="RUB",
         sizes=("38", "54"),
         heights=("162-168", "170-176"),
         is_new=is_new,
+        difficulty=difficulty,
+        description=description,
         product_url=f"https://vikisews.com/vykrojki/{source_product_id}/",
         image_url=image_url,
     )
@@ -75,6 +87,26 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
                     source_product_id="5",
                     audience="kids",
                 ),
+                product(
+                    "Лёгкая футболка",
+                    "Худи, футболки и лонгсливы",
+                    source_product_id="6",
+                    audience="women",
+                    difficulty="Для начинающих",
+                    description="Выкройка из трикотажа",
+                ),
+                ParsedProduct(
+                    source="grasser",
+                    source_product_id="g1",
+                    name="Платье бренда",
+                    brand="Grasser",
+                    audience="women",
+                    category="Платья",
+                    price=Decimal("500"),
+                    currency="RUB",
+                    product_url="https://grasser.ru/vykrojki/plate/",
+                    image_url="https://example.com/grasser.jpg",
+                ),
             ]
         )
 
@@ -92,6 +124,15 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parsed.section, "women")
         self.assertEqual(parsed.category, "c123")
         self.assertEqual(parsed.index, 7)
+        self.assertEqual(parsed.quick_filter, "all")
+
+    async def test_filter_callback_parsing(self) -> None:
+        packed = SectionFilterCallback(section="women", quick_filter="knit").pack()
+
+        parsed = SectionFilterCallback.unpack(packed)
+
+        self.assertEqual(parsed.section, "women")
+        self.assertEqual(parsed.quick_filter, "knit")
 
     async def test_pagination_sends_single_product_card(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
@@ -104,7 +145,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         await send_product_card(message, self.service, "women", category.code, 0)
 
         message.answer_photo.assert_awaited_once()
-        self.assertIn("1 / 3", str(message.answer_photo.await_args.kwargs["reply_markup"]))
+        self.assertIn("1 / 4", str(message.answer_photo.await_args.kwargs["reply_markup"]))
 
     async def test_switch_next_wraps_at_end(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
@@ -115,13 +156,14 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         )
         callback = SimpleNamespace(message=message, answer=AsyncMock())
         data = ProductCallback(
-            action="next", section="women", category=category.code, index=2
+            action="next", section="women", category=category.code, index=3
         )
 
         await handle_product_callback(callback, self.service, data)
 
         callback.answer.assert_awaited_once()
-        self.assertIn("1 / 3", str(message.answer_photo.await_args.kwargs["reply_markup"]))
+        message.delete.assert_not_called()
+        self.assertIn("1 / 4", str(message.answer_photo.await_args.kwargs["reply_markup"]))
 
     async def test_switch_prev_wraps_to_end(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
@@ -137,7 +179,8 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         await handle_product_callback(callback, self.service, data)
 
-        self.assertIn("3 / 3", str(message.answer.await_args.kwargs["reply_markup"]))
+        message.delete.assert_not_called()
+        self.assertIn("4 / 4", str(message.answer_photo.await_args.kwargs["reply_markup"]))
 
     async def test_product_without_image_uses_text_message(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
@@ -186,6 +229,60 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     def test_product_filters_for_new_section(self) -> None:
         self.assertTrue(product_filters("new", "Платья").is_new)
+
+    def test_product_filters_for_fast_filters(self) -> None:
+        beginner = product_filters("women", "Платья", "beg")
+        knit = product_filters("women", "Платья", "knit")
+
+        self.assertTrue(beginner.is_beginner)
+        self.assertTrue(knit.is_knit)
+
+    def test_product_keyboard_has_no_details_button(self) -> None:
+        keyboard = product_keyboard(
+            "women",
+            "c123",
+            0,
+            10,
+            "https://example.com/product/",
+        )
+
+        self.assertNotIn("Подробнее", str(keyboard))
+        self.assertIn("Открыть на сайте", str(keyboard))
+
+    async def test_main_menu_replaces_unisex_with_all_brands(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_main_menu(message, self.service)
+
+        keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("🏷 Все бренды", keyboard_text)
+        self.assertNotIn("👕 Унисекс", keyboard_text)
+
+    async def test_show_brands_lists_sources(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_brands(message, self.service)
+
+        keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("VikiSews", keyboard_text)
+        self.assertIn("Grasser", keyboard_text)
+
+    async def test_women_section_shows_fast_filter_buttons(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_section(message, self.service, "women")
+
+        keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("Для начинающих", keyboard_text)
+        self.assertIn("Из трикотажа", keyboard_text)
+
+    async def test_knit_filter_limits_categories(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_section(message, self.service, "women", "knit")
+
+        text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("Худи, футболки и лонгсливы", text)
 
     async def test_product_card_shows_new_badge(self) -> None:
         self.repository.upsert_many(

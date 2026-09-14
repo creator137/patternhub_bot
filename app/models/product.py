@@ -131,6 +131,13 @@ class CatalogCategory:
 
 
 @dataclass(frozen=True, slots=True)
+class CatalogBrand:
+    source: str
+    name: str
+    products: int
+
+
+@dataclass(frozen=True, slots=True)
 class ProductFilter:
     source: str | None = None
     audience: str | tuple[str, ...] | None = None
@@ -138,6 +145,8 @@ class ProductFilter:
     is_sale: bool | None = None
     is_free: bool | None = None
     is_new: bool | None = None
+    is_beginner: bool | None = None
+    is_knit: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)

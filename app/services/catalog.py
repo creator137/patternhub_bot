@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from time import monotonic
 
-from app.models.product import CatalogCategory, Product, ProductFilter, SyncStats
+from app.models.product import CatalogBrand, CatalogCategory, Product, ProductFilter, SyncStats
 from app.providers.base import BaseProvider
 from app.repositories.products import ProductRepository
 
@@ -17,9 +17,11 @@ WOMEN_SECTION = "women"
 MEN_SECTION = "men"
 KIDS_SECTION = "kids"
 UNISEX_SECTION = "unisex"
+BRANDS_SECTION = "brands"
 SALE_SECTION = "sale"
 FREE_SECTION = "free"
 NEW_SECTION = "new"
+SOURCE_SECTION_PREFIX = "src_"
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +102,7 @@ class CatalogService:
             CatalogSection(WOMEN_SECTION, "👗 Женские", women_count, women_count > 0),
             CatalogSection(MEN_SECTION, "👔 Мужские", men_count, men_count > 0),
             CatalogSection(KIDS_SECTION, "🧒 Детские", kids_count, kids_count > 0),
-            CatalogSection(UNISEX_SECTION, "👕 Унисекс", unisex_count, unisex_count > 0),
+            CatalogSection(BRANDS_SECTION, "🏷 Все бренды", await self.count_products()),
             CatalogSection(
                 SALE_SECTION,
                 "🔥 Скидки",
@@ -128,12 +130,19 @@ class CatalogService:
         return categories
 
     async def get_category_by_code(
-        self, code: str, *, section: str | None = None
+        self,
+        code: str,
+        *,
+        section: str | None = None,
+        filters: ProductFilter | None = None,
     ) -> CatalogCategory | None:
-        for category in await self.get_categories(section=section):
+        for category in await self.get_categories(section=section, filters=filters):
             if category.code == code:
                 return category
         return None
+
+    async def get_brands(self, filters: ProductFilter | None = None) -> list[CatalogBrand]:
+        return await asyncio.to_thread(self.repository.list_brands, filters)
 
     async def get_products(
         self,
@@ -169,6 +178,8 @@ class CatalogService:
             return ProductFilter(audience="kids")
         if section == UNISEX_SECTION:
             return ProductFilter(audience="unisex")
+        if section and section.startswith(SOURCE_SECTION_PREFIX):
+            return ProductFilter(source=section.removeprefix(SOURCE_SECTION_PREFIX))
         if section == SALE_SECTION:
             return ProductFilter(is_sale=True)
         if section == FREE_SECTION:

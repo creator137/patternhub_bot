@@ -17,16 +17,25 @@ def product(
     url: str = "https://vikisews.com/vykrojki/category/item/",
     price: str = "280",
     audience: str | None = "women",
+    category: str | None = None,
+    subcategory: str | None = None,
+    description: str | None = None,
+    difficulty: str | None = None,
+    brand: str = "VikiSews",
 ) -> ParsedProduct:
     return ParsedProduct(
         source=source,
         source_product_id=source_product_id,
         name="Платье Тест",
-        brand="VikiSews",
+        brand=brand,
         audience=audience,
+        category=category,
+        subcategory=subcategory,
         product_url=url,
         price=Decimal(price),
         currency="RUB",
+        description=description,
+        difficulty=difficulty,
     )
 
 
@@ -77,23 +86,68 @@ class ProductRepositoryTests(unittest.TestCase):
     def test_filters_by_audience_and_category(self) -> None:
         self.repository.upsert_many(
             [
-                product(source_product_id="1", audience="women"),
+                product(source_product_id="1", audience="women", category="Платья"),
                 product(
                     source_product_id="2",
                     audience="men",
+                    category="Брюки и шорты",
                     url="https://vikisews.com/vykrojki/muzhskie/item/",
                 ),
             ]
         )
 
-        saved = self.repository.list_products(
-            filters=__import__("app.models.product", fromlist=["ProductFilter"]).ProductFilter(
-                audience="men"
-            )
-        )
+        from app.models.product import ProductFilter
+
+        saved = self.repository.list_products(filters=ProductFilter(audience="men"))
 
         self.assertEqual(len(saved), 1)
         self.assertEqual(saved[0].audience, "men")
+
+    def test_lists_brands(self) -> None:
+        self.repository.upsert_many(
+            [
+                product(source_product_id="1", brand="VikiSews"),
+                product(
+                    source="grasser",
+                    source_product_id="2",
+                    brand="Grasser",
+                    url="https://grasser.ru/vykrojki/item/",
+                ),
+            ]
+        )
+
+        brands = self.repository.list_brands()
+
+        self.assertEqual(
+            [(brand.source, brand.name, brand.products) for brand in brands],
+            [("grasser", "Grasser", 1), ("vikisews", "VikiSews", 1)],
+        )
+
+    def test_filters_beginner_and_knit_products(self) -> None:
+        self.repository.upsert_many(
+            [
+                product(
+                    source_product_id="1",
+                    category="Платья",
+                    difficulty="Для начинающих",
+                    description="Плотная ткань",
+                ),
+                product(
+                    source_product_id="2",
+                    category="Худи, футболки и лонгсливы",
+                    description="Выкройка из трикотажа",
+                    url="https://vikisews.com/vykrojki/knit/item/",
+                ),
+            ]
+        )
+
+        from app.models.product import ProductFilter
+
+        beginner = self.repository.list_products(filters=ProductFilter(is_beginner=True))
+        knit = self.repository.list_products(filters=ProductFilter(is_knit=True))
+
+        self.assertEqual([item.source_product_id for item in beginner], ["1"])
+        self.assertEqual([item.source_product_id for item in knit], ["2"])
 
 
 if __name__ == "__main__":

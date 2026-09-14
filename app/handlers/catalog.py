@@ -20,11 +20,13 @@ from aiogram.types import (
 
 from app.models.product import CatalogCategory, Product, ProductFilter
 from app.services.catalog import (
+    BRANDS_SECTION,
     FREE_SECTION,
     KIDS_SECTION,
     MEN_SECTION,
     NEW_SECTION,
     SALE_SECTION,
+    SOURCE_SECTION_PREFIX,
     UNISEX_SECTION,
     WOMEN_SECTION,
     CatalogService,
@@ -35,11 +37,20 @@ logger = logging.getLogger(__name__)
 
 HOME_TEXT = "🏠 Главное меню"
 DETAILS_DESCRIPTION_LIMIT = 420
+FILTER_ALL = "all"
+FILTER_BEGINNER = "beg"
+FILTER_KNIT = "knit"
+AUDIENCE_SECTIONS = {WOMEN_SECTION, MEN_SECTION, KIDS_SECTION}
+QUICK_FILTER_TITLES = {
+    FILTER_ALL: "Все",
+    FILTER_BEGINNER: "Для начинающих",
+    FILTER_KNIT: "Из трикотажа",
+}
 SECTION_BY_TEXT = {
     "👗 Женские": WOMEN_SECTION,
     "👔 Мужские": MEN_SECTION,
     "🧒 Детские": KIDS_SECTION,
-    "👕 Унисекс": UNISEX_SECTION,
+    "🏷 Все бренды": BRANDS_SECTION,
     "🔥 Скидки": SALE_SECTION,
     "🆓 Бесплатные": FREE_SECTION,
     "🆕 Новинки": NEW_SECTION,
@@ -54,6 +65,7 @@ class SectionCallback(CallbackData, prefix="sec"):
 class CategoryCallback(CallbackData, prefix="cat"):
     section: str
     category: str
+    quick_filter: str = FILTER_ALL
 
 
 class ProductCallback(CallbackData, prefix="prd"):
@@ -61,6 +73,7 @@ class ProductCallback(CallbackData, prefix="prd"):
     section: str
     category: str
     index: int
+    quick_filter: str = FILTER_ALL
 
 
 def create_main_keyboard(sections: list[str] | None = None) -> ReplyKeyboardMarkup:
@@ -82,10 +95,9 @@ async def show_main_menu(message: Message, catalog_service: CatalogService) -> N
     visible_titles = [
         section.title
         for section in sections
-        if section.code in {WOMEN_SECTION, MEN_SECTION, KIDS_SECTION, UNISEX_SECTION}
-        and section.available
+        if section.code in AUDIENCE_SECTIONS and section.available
     ]
-    visible_titles.extend(["🔥 Скидки", "🆓 Бесплатные", "🆕 Новинки"])
+    visible_titles.extend(["🏷 Все бренды", "🔥 Скидки", "🆓 Бесплатные", "🆕 Новинки"])
     await message.answer(
         "Каталог выкроек\n\nВыберите раздел:",
         reply_markup=create_main_keyboard(visible_titles),
@@ -93,38 +105,98 @@ async def show_main_menu(message: Message, catalog_service: CatalogService) -> N
 
 
 async def show_section(
-    message: Message, catalog_service: CatalogService, section: str
+    message: Message,
+    catalog_service: CatalogService,
+    section: str,
+    quick_filter: str = FILTER_ALL,
 ) -> None:
-    categories = await catalog_service.get_categories(section=section)
+    if section == BRANDS_SECTION:
+        await show_brands(message, catalog_service)
+        return
+
+    filters = section_filters(section, quick_filter)
+    categories = await catalog_service.get_categories(filters=filters)
     if not categories:
         await message.answer("Сейчас товаров в этом разделе нет.")
         return
 
-    title = SECTION_TITLES.get(section, "Каталог")
+    title = await section_title(catalog_service, section)
+    filter_title = (
+        f"\nФильтр: {QUICK_FILTER_TITLES[quick_filter]}"
+        if section in AUDIENCE_SECTIONS and quick_filter != FILTER_ALL
+        else ""
+    )
     await message.answer(
-        f"{title}\n\nВыберите категорию:",
-        reply_markup=categories_keyboard(section, categories),
+        f"{title}{filter_title}\n\nВыберите категорию:",
+        reply_markup=categories_keyboard(section, categories, quick_filter),
+    )
+
+
+async def show_brands(message: Message, catalog_service: CatalogService) -> None:
+    brands = await catalog_service.get_brands()
+    if not brands:
+        await message.answer("Сейчас товаров в этом разделе нет.")
+        return
+    await message.answer(
+        "Все бренды\n\nВыберите бренд:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"{brand.name} ({brand.products})",
+                        callback_data=SectionCallback(
+                            section=f"{SOURCE_SECTION_PREFIX}{brand.source}"
+                        ).pack(),
+                    )
+                ]
+                for brand in brands
+            ]
+            + [[InlineKeyboardButton(text="Назад", callback_data=SectionCallback(section="home").pack())]]
+        ),
     )
 
 
 def categories_keyboard(
-    section: str, categories: list[CatalogCategory]
+    section: str,
+    categories: list[CatalogCategory],
+    quick_filter: str = FILTER_ALL,
 ) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+    rows: list[list[InlineKeyboardButton]] = []
+    if section in AUDIENCE_SECTIONS:
+        rows.extend(
             [
                 InlineKeyboardButton(
-                    text=f"{category.name} ({category.products})",
-                    callback_data=CategoryCallback(
+                    text=f"{'✓ ' if quick_filter == code else ''}{title}",
+                    callback_data=SectionFilterCallback(
                         section=section,
-                        category=category.code,
+                        quick_filter=code,
                     ).pack(),
                 )
             ]
-            for category in categories
+            for code, title in QUICK_FILTER_TITLES.items()
+        )
+    rows.extend(
+        [
+            InlineKeyboardButton(
+                text=f"{category.name} ({category.products})",
+                callback_data=CategoryCallback(
+                    section=section,
+                    category=category.code,
+                    quick_filter=quick_filter,
+                ).pack(),
+            )
         ]
-        + [[InlineKeyboardButton(text="Назад", callback_data=SectionCallback(section="home").pack())]]
+        for category in categories
     )
+    rows.append([InlineKeyboardButton(text="Назад", callback_data=SectionCallback(section="home").pack())])
+    return InlineKeyboardMarkup(
+        inline_keyboard=rows
+    )
+
+
+class SectionFilterCallback(CallbackData, prefix="flt"):
+    section: str
+    quick_filter: str = FILTER_ALL
 
 
 async def show_category_callback(
@@ -139,7 +211,7 @@ async def show_category_callback(
         callback_data.section,
         callback_data.category,
         0,
-        replace=True,
+        quick_filter=callback_data.quick_filter,
     )
 
 
@@ -150,22 +222,33 @@ async def handle_product_callback(
 ) -> None:
     if callback_data.action == "back":
         await callback.answer()
-        categories = await catalog_service.get_categories(section=callback_data.section)
+        filters = section_filters(callback_data.section, callback_data.quick_filter)
+        categories = await catalog_service.get_categories(filters=filters)
         if callback.message:
             await callback.message.answer(
                 "Выберите категорию:",
-                reply_markup=categories_keyboard(callback_data.section, categories),
+                reply_markup=categories_keyboard(
+                    callback_data.section,
+                    categories,
+                    callback_data.quick_filter,
+                ),
             )
         return
 
+    section_filter = section_filters(callback_data.section, callback_data.quick_filter)
     category = await catalog_service.get_category_by_code(
-        callback_data.category, section=callback_data.section
+        callback_data.category,
+        filters=section_filter,
     )
     if category is None:
         await callback.answer("Категория больше недоступна.", show_alert=True)
         return
 
-    filters = product_filters(callback_data.section, category.name)
+    filters = product_filters(
+        callback_data.section,
+        category.name,
+        callback_data.quick_filter,
+    )
     total = await catalog_service.count_products(filters)
     if total == 0:
         await callback.answer("Сейчас товаров в этом разделе нет.", show_alert=True)
@@ -195,7 +278,7 @@ async def handle_product_callback(
             callback_data.section,
             callback_data.category,
             next_index,
-            replace=True,
+            quick_filter=callback_data.quick_filter,
         )
 
 
@@ -207,15 +290,20 @@ async def send_product_card(
     index: int,
     *,
     replace: bool = False,
+    quick_filter: str = FILTER_ALL,
 ) -> None:
     if message is None:
         return
-    category = await catalog_service.get_category_by_code(category_code, section=section)
+    section_filter = section_filters(section, quick_filter)
+    category = await catalog_service.get_category_by_code(
+        category_code,
+        filters=section_filter,
+    )
     if category is None:
         await message.answer("Категория больше недоступна.")
         return
 
-    filters = product_filters(section, category.name)
+    filters = product_filters(section, category.name, quick_filter)
     total = await catalog_service.count_products(filters)
     if total == 0:
         await message.answer("Сейчас товаров в этом разделе нет.")
@@ -234,7 +322,14 @@ async def send_product_card(
             logger.debug("Could not delete previous catalog message", exc_info=True)
 
     text = format_product_card(product)
-    keyboard = product_keyboard(section, category_code, safe_index, total, product.product_url)
+    keyboard = product_keyboard(
+        section,
+        category_code,
+        safe_index,
+        total,
+        product.product_url,
+        quick_filter,
+    )
     if product.image_url:
         try:
             await message.answer_photo(
@@ -257,13 +352,35 @@ async def product_at(
     return products[0] if products else None
 
 
-def product_filters(section: str, category: str) -> ProductFilter:
-    return ProductFilter(
+def section_filters(section: str, quick_filter: str = FILTER_ALL) -> ProductFilter:
+    source = source_from_section(section)
+    filters = ProductFilter(
+        source=source,
         audience=section_audience(section),
-        category=category,
         is_sale=True if section == SALE_SECTION else None,
         is_free=True if section == FREE_SECTION else None,
         is_new=True if section == NEW_SECTION else None,
+        is_beginner=True if quick_filter == FILTER_BEGINNER else None,
+        is_knit=True if quick_filter == FILTER_KNIT else None,
+    )
+    return filters
+
+
+def product_filters(
+    section: str,
+    category: str,
+    quick_filter: str = FILTER_ALL,
+) -> ProductFilter:
+    filters = section_filters(section, quick_filter)
+    return ProductFilter(
+        source=filters.source,
+        audience=filters.audience,
+        category=category,
+        is_sale=filters.is_sale,
+        is_free=filters.is_free,
+        is_new=filters.is_new,
+        is_beginner=filters.is_beginner,
+        is_knit=filters.is_knit,
     )
 
 
@@ -279,8 +396,29 @@ def section_audience(section: str) -> str | None:
     return None
 
 
+def source_from_section(section: str) -> str | None:
+    if section.startswith(SOURCE_SECTION_PREFIX):
+        return section.removeprefix(SOURCE_SECTION_PREFIX)
+    return None
+
+
+async def section_title(catalog_service: CatalogService, section: str) -> str:
+    if section.startswith(SOURCE_SECTION_PREFIX):
+        source = section.removeprefix(SOURCE_SECTION_PREFIX)
+        for brand in await catalog_service.get_brands():
+            if brand.source == source:
+                return brand.name
+        return source
+    return SECTION_TITLES.get(section, "Каталог")
+
+
 def product_keyboard(
-    section: str, category_code: str, index: int, total: int, product_url: str
+    section: str,
+    category_code: str,
+    index: int,
+    total: int,
+    product_url: str,
+    quick_filter: str = FILTER_ALL,
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -292,6 +430,7 @@ def product_keyboard(
                         section=section,
                         category=category_code,
                         index=index,
+                        quick_filter=quick_filter,
                     ).pack(),
                 ),
                 InlineKeyboardButton(text=f"{index + 1} / {total}", callback_data="noop"),
@@ -302,19 +441,11 @@ def product_keyboard(
                         section=section,
                         category=category_code,
                         index=index,
+                        quick_filter=quick_filter,
                     ).pack(),
                 ),
             ],
             [
-                InlineKeyboardButton(
-                    text="Подробнее",
-                    callback_data=ProductCallback(
-                        action="details",
-                        section=section,
-                        category=category_code,
-                        index=index,
-                    ).pack(),
-                ),
                 InlineKeyboardButton(text="Открыть на сайте", url=product_url),
             ],
             [
@@ -325,6 +456,7 @@ def product_keyboard(
                         section=section,
                         category=category_code,
                         index=index,
+                        quick_filter=quick_filter,
                     ).pack(),
                 )
             ],
@@ -439,6 +571,27 @@ def create_catalog_router(catalog_service: CatalogService) -> Router:
         await callback.answer()
         if callback.message:
             await show_main_menu(callback.message, catalog_service)
+
+    @router.callback_query(SectionCallback.filter())
+    async def bound_section_callback(
+        callback: CallbackQuery, callback_data: SectionCallback
+    ) -> None:
+        await callback.answer()
+        if callback.message:
+            await show_section(callback.message, catalog_service, callback_data.section)
+
+    @router.callback_query(SectionFilterCallback.filter())
+    async def bound_section_filter(
+        callback: CallbackQuery, callback_data: SectionFilterCallback
+    ) -> None:
+        await callback.answer()
+        if callback.message:
+            await show_section(
+                callback.message,
+                catalog_service,
+                callback_data.section,
+                callback_data.quick_filter,
+            )
 
     @router.callback_query(CategoryCallback.filter())
     async def bound_category(
