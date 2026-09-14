@@ -9,7 +9,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import (
     BufferedInputFile,
@@ -42,6 +42,7 @@ HOME_TEXT = "🏠 Главное меню"
 DETAILS_DESCRIPTION_LIMIT = 420
 IMAGE_DOWNLOAD_TIMEOUT = 15.0
 MAX_IMAGE_DOWNLOAD_BYTES = 10 * 1024 * 1024
+TELEGRAM_SEND_RETRIES = 3
 FILTER_ALL = "all"
 FILTER_BEGINNER = "beg"
 FILTER_KNIT = "knit"
@@ -105,7 +106,8 @@ async def show_main_menu(message: Message, catalog_service: CatalogService) -> N
         if section.code in AUDIENCE_SECTIONS and section.available
     ]
     visible_titles.extend(["🏷 Все бренды", "🔥 Скидки", "🆓 Бесплатные", "🆕 Новинки"])
-    await message.answer(
+    await send_message_with_retry(
+        message,
         "Каталог выкроек\n\nВыберите раздел:",
         reply_markup=create_main_keyboard(visible_titles),
     )
@@ -135,7 +137,8 @@ async def show_section(
         if categories
         else f"{title}{filter_title}\n\nСейчас товаров в этом фильтре нет."
     )
-    await message.answer(
+    await send_message_with_retry(
+        message,
         text,
         reply_markup=categories_keyboard(section, categories, quick_filter, quick_counts),
     )
@@ -144,9 +147,10 @@ async def show_section(
 async def show_brands(message: Message, catalog_service: CatalogService) -> None:
     brands = await catalog_service.get_brands()
     if not brands:
-        await message.answer("Сейчас товаров в этом разделе нет.")
+        await send_message_with_retry(message, "Сейчас товаров в этом разделе нет.")
         return
-    await message.answer(
+    await send_message_with_retry(
+        message,
         "Все бренды\n\nВыберите бренд:",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
@@ -280,7 +284,8 @@ async def handle_product_callback_once(
         filters = section_filters(callback_data.section, callback_data.quick_filter)
         categories = await catalog_service.get_categories(filters=filters)
         if callback.message:
-            await callback.message.answer(
+            await send_message_with_retry(
+                callback.message,
                 "Выберите категорию:",
                 reply_markup=categories_keyboard(
                     callback_data.section,
@@ -316,7 +321,11 @@ async def handle_product_callback_once(
             return
         await safe_callback_answer(callback)
         if callback.message:
-            await callback.message.answer(format_product_details(product), parse_mode="HTML")
+            await send_message_with_retry(
+                callback.message,
+                format_product_details(product),
+                parse_mode="HTML",
+            )
         return
 
     next_index = callback_data.index
@@ -377,19 +386,19 @@ async def send_product_card(
         filters=section_filter,
     )
     if category is None:
-        await message.answer("Категория больше недоступна.")
+        await send_message_with_retry(message, "Категория больше недоступна.")
         return
 
     filters = product_filters(section, category.name, quick_filter)
     total = await catalog_service.count_products(filters)
     if total == 0:
-        await message.answer("Сейчас товаров в этом разделе нет.")
+        await send_message_with_retry(message, "Сейчас товаров в этом разделе нет.")
         return
 
     safe_index = index % total
     product = await product_at(catalog_service, filters, safe_index)
     if product is None:
-        await message.answer("Сейчас товаров в этом разделе нет.")
+        await send_message_with_retry(message, "Сейчас товаров в этом разделе нет.")
         return
 
     if replace:
@@ -409,7 +418,8 @@ async def send_product_card(
     )
     if product.telegram_file_id:
         try:
-            sent_message = await message.answer_photo(
+            sent_message = await send_photo_with_retry(
+                message,
                 photo=product.telegram_file_id,
                 caption=text,
                 parse_mode="HTML",
@@ -425,7 +435,8 @@ async def send_product_card(
 
     if product.image_url:
         try:
-            sent_message = await message.answer_photo(
+            sent_message = await send_photo_with_retry(
+                message,
                 photo=telegram_photo_url(product.image_url),
                 caption=text,
                 parse_mode="HTML",
@@ -442,7 +453,8 @@ async def send_product_card(
         photo_file = await download_product_photo(product.image_url, product.id)
         if photo_file is not None:
             try:
-                sent_message = await message.answer_photo(
+                sent_message = await send_photo_with_retry(
+                    message,
                     photo=photo_file,
                     caption=text,
                     parse_mode="HTML",
@@ -458,7 +470,7 @@ async def send_product_card(
 
         await catalog_service.save_product_image_status(product.id, "failed")
 
-    await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+    await send_message_with_retry(message, text, parse_mode="HTML", reply_markup=keyboard)
 
 
 async def product_at(
@@ -483,6 +495,38 @@ async def safe_callback_answer(
             await callback.answer(text, show_alert=show_alert)
     except TelegramAPIError:
         logger.debug("Could not answer Telegram callback", exc_info=True)
+
+
+async def send_message_with_retry(
+    message: Message,
+    *args: object,
+    **kwargs: object,
+) -> Message | None:
+    return await telegram_call_with_retry(message.answer, *args, **kwargs)
+
+
+async def send_photo_with_retry(
+    message: Message,
+    *args: object,
+    **kwargs: object,
+) -> Message | None:
+    return await telegram_call_with_retry(message.answer_photo, *args, **kwargs)
+
+
+async def telegram_call_with_retry(method, *args: object, **kwargs: object) -> Message | None:
+    for attempt in range(1, TELEGRAM_SEND_RETRIES + 1):
+        try:
+            return await method(*args, **kwargs)
+        except TelegramNetworkError:
+            if attempt >= TELEGRAM_SEND_RETRIES:
+                logger.warning(
+                    "Telegram send failed after %d attempts",
+                    TELEGRAM_SEND_RETRIES,
+                    exc_info=True,
+                )
+                return None
+            await asyncio.sleep(0.3 * attempt)
+    return None
 
 
 def section_filters(section: str, quick_filter: str = FILTER_ALL) -> ProductFilter:

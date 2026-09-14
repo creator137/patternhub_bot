@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramNetworkError
 from app.database import Database
 from app.handlers.catalog import (
     CategoryCallback,
@@ -25,6 +25,7 @@ from app.handlers.catalog import (
     quick_filter_button_text,
     safe_callback_answer,
     send_product_card,
+    send_message_with_retry,
     show_brands,
     show_main_menu,
     show_section,
@@ -241,6 +242,25 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         await safe_callback_answer(callback)
 
         callback.answer.assert_awaited_once_with()
+
+    async def test_message_send_retries_after_network_error(self) -> None:
+        sent = SimpleNamespace(message_id=1)
+        message = SimpleNamespace(
+            answer=AsyncMock(
+                side_effect=[
+                    TelegramNetworkError(
+                        method=SimpleNamespace(),
+                        message="connection reset by peer",
+                    ),
+                    sent,
+                ]
+            )
+        )
+
+        result = await send_message_with_retry(message, "Каталог")
+
+        self.assertIs(result, sent)
+        self.assertEqual(message.answer.await_count, 2)
 
     async def test_product_without_image_uses_text_message(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
