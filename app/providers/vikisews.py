@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from time import monotonic
@@ -12,7 +13,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from app.models.product import ParsedProduct
+from app.models.product import ParsedProduct, Product
 from app.providers.base import BaseProvider, ProviderResult
 
 
@@ -119,44 +120,101 @@ class VikiSewsProvider(BaseProvider):
                 errors += 1
 
             if self.enrich_details and errors == 0:
-                detail_products = list(products_by_key.values())
-                if self.detail_limit is not None:
-                    detail_products = detail_products[: self.detail_limit]
-                for index, product in enumerate(detail_products, start=1):
-                    html = await self._get_page(client, product.product_url)
-                    if html is None:
-                        errors += 1
-                        logger.warning(
-                            "Could not fetch VikiSews detail page %s",
-                            product.product_url,
-                        )
-                        continue
-                    try:
-                        detailed = self.parse_product_page(
-                            html,
-                            product.product_url,
-                            product,
-                        )
-                    except Exception as error:  # noqa: BLE001
-                        errors += 1
-                        logger.warning(
-                            "Could not parse VikiSews detail page %s: %s",
-                            product.product_url,
-                            error,
-                        )
-                        continue
-                    key = detailed.source_product_id or detailed.product_url
-                    products_by_key[key] = self._merge_product(product, detailed)
-                    logger.info(
-                        "VikiSews detail page %d/%d: %s beginner=%s knit=%s",
-                        index,
-                        len(detail_products),
-                        product.product_url,
-                        products_by_key[key].is_beginner,
-                        products_by_key[key].is_knit,
-                    )
+                enriched_result = await self._enrich_parsed_products(
+                    client,
+                    list(products_by_key.values()),
+                )
+                errors += enriched_result.errors
+                for product in enriched_result.products:
+                    products_by_key[product.source_product_id or product.product_url] = product
 
         return ProviderResult(list(products_by_key.values()), errors, complete=errors == 0)
+
+    async def enrich_products(self, products: Iterable[Product]) -> ProviderResult:
+        seed_products = [self._seed_from_product(product) for product in products]
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; PatternHubBot/0.2; "
+                "+https://github.com/local/patternhub-bot)"
+            ),
+            "Accept-Language": "ru-RU,ru;q=0.9",
+            "Connection": "close",
+        }
+        timeout = httpx.Timeout(self.timeout, connect=min(20.0, self.timeout))
+        async with httpx.AsyncClient(
+            headers=headers,
+            cookies={"django_language": "ru"},
+            timeout=timeout,
+            follow_redirects=True,
+            trust_env=False,
+        ) as client:
+            return await self._enrich_parsed_products(client, seed_products)
+
+    @staticmethod
+    def _seed_from_product(product: Product) -> ParsedProduct:
+        return ParsedProduct(
+            source=product.source,
+            source_product_id=product.source_product_id,
+            name=product.name,
+            brand=product.brand,
+            audience=product.audience,
+            category=product.category,
+            subcategory=product.subcategory,
+            price=product.price,
+            old_price=product.old_price,
+            currency=product.currency,
+            is_sale=product.is_sale,
+            is_free=product.is_free,
+            is_new=product.is_new,
+            is_beginner=product.is_beginner,
+            is_knit=product.is_knit,
+            sizes=product.sizes,
+            heights=product.heights,
+            difficulty=product.difficulty,
+            description=product.description,
+            product_url=product.product_url,
+            image_url=product.image_url,
+            is_available=product.is_available,
+            source_updated_at=product.source_updated_at,
+        ).normalized()
+
+    async def _enrich_parsed_products(
+        self,
+        client: httpx.AsyncClient,
+        products: list[ParsedProduct],
+    ) -> ProviderResult:
+        detail_products = products
+        if self.detail_limit is not None:
+            detail_products = detail_products[: self.detail_limit]
+        enriched: list[ParsedProduct] = []
+        errors = 0
+        for index, product in enumerate(detail_products, start=1):
+            html = await self._get_page(client, product.product_url)
+            if html is None:
+                errors += 1
+                logger.warning("Could not fetch VikiSews detail page %s", product.product_url)
+                continue
+            try:
+                detailed = self.parse_product_page(html, product.product_url, product)
+            except Exception as error:  # noqa: BLE001
+                errors += 1
+                logger.warning(
+                    "Could not parse VikiSews detail page %s: %s",
+                    product.product_url,
+                    error,
+                )
+                continue
+            merged = self._merge_product(product, detailed)
+            enriched.append(merged)
+            logger.info(
+                "VikiSews detail page %d/%d: %s beginner=%s knit=%s",
+                index,
+                len(detail_products),
+                product.product_url,
+                merged.is_beginner,
+                merged.is_knit,
+            )
+        return ProviderResult(enriched, errors, complete=errors == 0)
 
     async def _get_page(
         self, client: httpx.AsyncClient, url: str

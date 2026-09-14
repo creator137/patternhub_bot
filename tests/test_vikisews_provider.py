@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
+from app.models.product import Product
 from app.providers.vikisews import VikiSewsProvider
 
 
@@ -108,6 +110,45 @@ class VikiSewsProviderTests(unittest.TestCase):
 
         self.assertEqual((men.audience, men.category), ("men", "Брюки и шорты"))
         self.assertEqual((kids.audience, kids.category), ("kids", "Платья"))
+
+    def test_seed_from_saved_product_preserves_existing_data(self) -> None:
+        saved = Product(
+            id=1,
+            source="vikisews",
+            source_product_id="100",
+            name="Гелла футболка",
+            brand="VikiSews",
+            audience="women",
+            category="Худи, футболки и лонгсливы",
+            subcategory="Футболки",
+            price=Decimal("300.00"),
+            old_price=None,
+            currency="RUB",
+            is_sale=False,
+            is_free=False,
+            is_new=False,
+            is_beginner=False,
+            is_knit=False,
+            sizes=("40",),
+            heights=("158",),
+            difficulty=None,
+            description=None,
+            product_url="https://vikisews.com/vykrojki/khudi-futbolki-longslivy/gella-futbolka/",
+            image_url="https://cdn.example/gella.jpg",
+            telegram_file_id=None,
+            image_status=None,
+            is_available=True,
+            created_at=datetime(2026, 1, 1),
+            updated_at=datetime(2026, 1, 1),
+            source_updated_at=None,
+        )
+
+        seed = self.provider._seed_from_product(saved)
+
+        self.assertEqual(seed.source_product_id, "100")
+        self.assertEqual(seed.name, "Гелла футболка")
+        self.assertEqual(seed.sizes, ("40",))
+        self.assertEqual(seed.image_url, "https://cdn.example/gella.jpg")
 
 
 class ParsedProductLike:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from time import monotonic
 
 from app.config import load_settings
 from app.database import Database
@@ -32,6 +33,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--detail-limit",
         type=positive_int,
         help="limit detail pages fetched with --enrich-details",
+    )
+    enrich_parser = subparsers.add_parser(
+        "enrich-details", help="enrich saved products from detail pages"
+    )
+    enrich_parser.add_argument("source", choices=available_providers())
+    enrich_parser.add_argument(
+        "--limit",
+        type=positive_int,
+        help="limit detail pages fetched from saved products",
     )
     subparsers.add_parser("catalog-stats", help="show catalog statistics")
     products_parser = subparsers.add_parser("products", help="show saved products")
@@ -148,6 +158,36 @@ def main() -> None:
             f"Marked unavailable: {stats.unavailable}\nErrors: {stats.errors}\n"
             f"Complete: {stats.complete}\n"
             f"Duration: {stats.duration_seconds:.2f}s"
+        )
+        return
+    if args.command == "enrich-details":
+        from app.models.product import ProductFilter
+        from app.providers.registry import create_provider
+
+        configure_logging()
+        repository = product_repository()
+        total = repository.count_products(ProductFilter(source=args.source))
+        products = repository.list_products(
+            limit=total,
+            filters=ProductFilter(source=args.source),
+        )
+        provider = create_provider(
+            args.source,
+            enrich_details=True,
+            detail_limit=args.limit,
+        )
+        enrich_products = getattr(provider, "enrich_products", None)
+        if enrich_products is None:
+            raise SystemExit(f"{args.source} does not support detail enrichment")
+
+        started_at = monotonic()
+        result = asyncio.run(enrich_products(products))
+        added, updated = repository.upsert_many(result.products)
+        print(
+            f"Source: {args.source}\nFound: {total}\nEnriched: {len(result.products)}\n"
+            f"Added: {added}\nUpdated: {updated}\nErrors: {result.errors}\n"
+            f"Complete: {result.complete}\n"
+            f"Duration: {monotonic() - started_at:.2f}s"
         )
         return
 
