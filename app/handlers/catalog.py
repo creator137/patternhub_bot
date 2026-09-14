@@ -334,14 +334,31 @@ async def send_product_card(
         product.product_url,
         quick_filter,
     )
+    if product.telegram_file_id:
+        try:
+            sent_message = await message.answer_photo(
+                photo=product.telegram_file_id,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+            )
+            await remember_photo_file_id(catalog_service, product.id, sent_message)
+            return
+        except TelegramAPIError:
+            logger.info(
+                "Telegram could not send product image by file_id: product_id=%s",
+                product.id,
+            )
+
     if product.image_url:
         try:
-            await message.answer_photo(
+            sent_message = await message.answer_photo(
                 photo=telegram_photo_url(product.image_url),
                 caption=text,
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
+            await remember_photo_file_id(catalog_service, product.id, sent_message)
             return
         except TelegramAPIError:
             logger.info(
@@ -352,18 +369,21 @@ async def send_product_card(
         photo_file = await download_product_photo(product.image_url, product.id)
         if photo_file is not None:
             try:
-                await message.answer_photo(
+                sent_message = await message.answer_photo(
                     photo=photo_file,
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=keyboard,
                 )
+                await remember_photo_file_id(catalog_service, product.id, sent_message)
                 return
             except TelegramAPIError:
                 logger.info(
                     "Telegram could not send downloaded product image: product_id=%s",
                     product.id,
                 )
+
+        await catalog_service.save_product_image_status(product.id, "failed")
 
     await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -609,6 +629,24 @@ async def download_product_photo(
     if "." not in filename:
         filename = f"{filename}.jpg"
     return BufferedInputFile(content, filename=filename)
+
+
+async def remember_photo_file_id(
+    catalog_service: CatalogService,
+    product_id: int,
+    sent_message: Message | None,
+) -> None:
+    file_id = product_photo_file_id(sent_message)
+    if file_id:
+        await catalog_service.save_product_photo_file_id(product_id, file_id)
+
+
+def product_photo_file_id(sent_message: Message | None) -> str | None:
+    photos = getattr(sent_message, "photo", None)
+    if not isinstance(photos, (list, tuple)) or not photos:
+        return None
+    photo = max(photos, key=lambda item: item.file_size or 0)
+    return photo.file_id
 
 
 def compact_range(values: tuple[str, ...]) -> str:

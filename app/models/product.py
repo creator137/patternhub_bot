@@ -117,6 +117,8 @@ class Product:
     description: str | None
     product_url: str
     image_url: str | None
+    telegram_file_id: str | None
+    image_status: str | None
     is_available: bool
     created_at: datetime
     updated_at: datetime

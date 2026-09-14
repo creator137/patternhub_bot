@@ -65,6 +65,26 @@ class ProductRepositoryTests(unittest.TestCase):
         self.assertEqual(len(saved), 1)
         self.assertEqual(saved[0].price, Decimal("199.00"))
 
+    def test_saves_telegram_photo_cache_without_reimport(self) -> None:
+        self.repository.upsert_many([product()])
+        saved = self.repository.list_products()[0]
+
+        self.repository.set_photo_file_id(saved.id, "telegram-file-id")
+        cached = self.repository.get_product(saved.id)
+
+        self.assertEqual(cached.telegram_file_id, "telegram-file-id")
+        self.assertEqual(cached.image_status, "telegram_file_id")
+
+    def test_reimport_keeps_telegram_photo_cache(self) -> None:
+        self.repository.upsert_many([product()])
+        saved = self.repository.list_products()[0]
+        self.repository.set_photo_file_id(saved.id, "telegram-file-id")
+
+        self.repository.upsert_many([product(price="199")])
+        updated = self.repository.list_products()[0]
+
+        self.assertEqual(updated.telegram_file_id, "telegram-file-id")
+
     def test_url_is_fallback_unique_key(self) -> None:
         first = product(source_product_id=None)
         second = product(source_product_id=None, price="150")

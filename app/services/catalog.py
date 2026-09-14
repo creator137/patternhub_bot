@@ -161,6 +161,23 @@ class CatalogService:
     async def get_product(self, product_id: int) -> Product | None:
         return await asyncio.to_thread(self.repository.get_product, product_id)
 
+    async def save_product_photo_file_id(
+        self,
+        product_id: int,
+        file_id: str,
+        *,
+        status: str = "telegram_file_id",
+    ) -> None:
+        await asyncio.to_thread(
+            self.repository.set_photo_file_id,
+            product_id,
+            file_id,
+            status=status,
+        )
+
+    async def save_product_image_status(self, product_id: int, status: str) -> None:
+        await asyncio.to_thread(self.repository.set_image_status, product_id, status)
+
     async def count_products(self, filters: ProductFilter | None = None) -> int:
         return await asyncio.to_thread(self.repository.count_products, filters)
 

@@ -118,6 +118,37 @@ class ProductRepository:
             ).fetchone()
         return self._to_product(row) if row else None
 
+    def set_photo_file_id(
+        self,
+        product_id: int,
+        file_id: str,
+        *,
+        status: str = "telegram_file_id",
+    ) -> None:
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                UPDATE products
+                SET telegram_file_id = ?,
+                    image_status = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (file_id, status, product_id),
+            )
+
+    def set_image_status(self, product_id: int, status: str) -> None:
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                UPDATE products
+                SET image_status = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (status, product_id),
+            )
+
     def count_products(self, filters: ProductFilter | None = None) -> int:
         where, parameters = self._where(filters)
         with self.database.connect() as connection:
@@ -414,6 +445,8 @@ class ProductRepository:
             description=row["description"],
             product_url=row["product_url"],
             image_url=row["image_url"],
+            telegram_file_id=row["telegram_file_id"],
+            image_status=row["image_status"],
             is_available=bool(row["is_available"]),
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),

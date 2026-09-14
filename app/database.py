@@ -51,6 +51,8 @@ class Database:
                     description TEXT,
                     product_url TEXT NOT NULL,
                     image_url TEXT,
+                    telegram_file_id TEXT,
+                    image_status TEXT,
                     is_available INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -67,6 +69,8 @@ class Database:
             )
             self._ensure_column(connection, "products", "is_new", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(connection, "products", "audience", "TEXT")
+            self._ensure_column(connection, "products", "telegram_file_id", "TEXT")
+            self._ensure_column(connection, "products", "image_status", "TEXT")
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_products_flags

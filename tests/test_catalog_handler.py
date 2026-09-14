@@ -20,6 +20,7 @@ from app.handlers.catalog import (
     handle_product_callback,
     product_keyboard,
     product_filters,
+    product_photo_file_id,
     send_product_card,
     show_brands,
     show_main_menu,
@@ -199,8 +200,14 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def test_product_image_falls_back_to_downloaded_file(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
         error = TelegramAPIError(method=SimpleNamespace(), message="failed")
+        sent_message = SimpleNamespace(
+            photo=[
+                SimpleNamespace(file_id="small-file", file_size=100),
+                SimpleNamespace(file_id="large-file", file_size=200),
+            ]
+        )
         message = SimpleNamespace(
-            answer_photo=AsyncMock(side_effect=[error, None]),
+            answer_photo=AsyncMock(side_effect=[error, sent_message]),
             answer=AsyncMock(),
             delete=AsyncMock(),
         )
@@ -216,6 +223,8 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(message.answer_photo.await_count, 2)
         self.assertIs(message.answer_photo.await_args.kwargs["photo"], photo_file)
         message.answer.assert_not_awaited()
+        saved = self.repository.get_product(1)
+        self.assertEqual(saved.telegram_file_id, "large-file")
 
     async def test_product_image_falls_back_to_text_after_download_failure(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
@@ -234,6 +243,39 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         message.answer_photo.assert_awaited_once()
         message.answer.assert_awaited_once()
+        saved = self.repository.get_product(1)
+        self.assertEqual(saved.image_status, "failed")
+
+    async def test_product_image_uses_cached_telegram_file_id_first(self) -> None:
+        self.repository.set_photo_file_id(1, "cached-file-id")
+        category = (await self.service.get_categories(section="women"))[0]
+        message = SimpleNamespace(
+            answer_photo=AsyncMock(return_value=SimpleNamespace(photo=[])),
+            answer=AsyncMock(),
+            delete=AsyncMock(),
+        )
+
+        with patch(
+            "app.handlers.catalog.download_product_photo",
+            new=AsyncMock(return_value=object()),
+        ) as download:
+            await send_product_card(message, self.service, "women", category.code, 0)
+
+        message.answer_photo.assert_awaited_once()
+        self.assertEqual(message.answer_photo.await_args.kwargs["photo"], "cached-file-id")
+        download.assert_not_awaited()
+        message.answer.assert_not_awaited()
+
+    def test_product_photo_file_id_uses_largest_photo(self) -> None:
+        sent_message = SimpleNamespace(
+            photo=[
+                SimpleNamespace(file_id="small", file_size=10),
+                SimpleNamespace(file_id="large", file_size=99),
+                SimpleNamespace(file_id="unknown", file_size=None),
+            ]
+        )
+
+        self.assertEqual(product_photo_file_id(sent_message), "large")
 
     async def test_product_without_price_has_consistent_text(self) -> None:
         products = await self.service.get_products(
