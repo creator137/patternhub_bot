@@ -43,6 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=positive_int,
         help="limit detail pages fetched from saved products",
     )
+    enrich_parser.add_argument(
+        "--batch-size",
+        type=positive_int,
+        default=25,
+        help="save enriched products after each batch",
+    )
     subparsers.add_parser("catalog-stats", help="show catalog statistics")
     products_parser = subparsers.add_parser("products", help="show saved products")
     products_parser.add_argument("--limit", type=positive_int, default=10)
@@ -171,22 +177,31 @@ def main() -> None:
             limit=total,
             filters=ProductFilter(source=args.source),
         )
-        provider = create_provider(
-            args.source,
-            enrich_details=True,
-            detail_limit=args.limit,
-        )
+        selected_products = products[: args.limit] if args.limit else products
+        provider = create_provider(args.source, enrich_details=True)
         enrich_products = getattr(provider, "enrich_products", None)
         if enrich_products is None:
             raise SystemExit(f"{args.source} does not support detail enrichment")
 
         started_at = monotonic()
-        result = asyncio.run(enrich_products(products))
-        added, updated = repository.upsert_many(result.products)
+        added = 0
+        updated = 0
+        enriched = 0
+        errors = 0
+        complete = True
+        for start in range(0, len(selected_products), args.batch_size):
+            batch = selected_products[start : start + args.batch_size]
+            result = asyncio.run(enrich_products(batch))
+            batch_added, batch_updated = repository.upsert_many(result.products)
+            added += batch_added
+            updated += batch_updated
+            enriched += len(result.products)
+            errors += result.errors
+            complete = complete and result.complete
         print(
-            f"Source: {args.source}\nFound: {total}\nEnriched: {len(result.products)}\n"
-            f"Added: {added}\nUpdated: {updated}\nErrors: {result.errors}\n"
-            f"Complete: {result.complete}\n"
+            f"Source: {args.source}\nFound: {total}\nEnriched: {enriched}\n"
+            f"Added: {added}\nUpdated: {updated}\nErrors: {errors}\n"
+            f"Complete: {complete}\n"
             f"Duration: {monotonic() - started_at:.2f}s"
         )
         return

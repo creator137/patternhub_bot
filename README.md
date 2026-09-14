@@ -113,7 +113,8 @@ python -m app enrich-details vikisews
 ```
 
 Оно не заменяет обычный импорт и не запускает lifecycle reconciliation; это
-maintenance-команда для дозаписи detail-признаков вроде трикотажа.
+maintenance-команда для дозаписи detail-признаков вроде трикотажа. Результаты
+сохраняются пачками, размер пачки можно менять через `--batch-size`.
 
 ## Управление тестовым chat_id
 
