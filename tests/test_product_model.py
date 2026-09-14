@@ -59,6 +59,16 @@ class ParsedProductTests(unittest.TestCase):
 
         self.assertTrue(product.is_beginner)
 
+    def test_lightweight_material_does_not_mark_beginner(self) -> None:
+        product = ParsedProduct(
+            source="vikisews",
+            name="Платье",
+            product_url="https://vikisews.com/item/1",
+            description="Для пошива подойдет легкая костюмная ткань.",
+        ).normalized()
+
+        self.assertFalse(product.is_beginner)
+
     def test_knit_flag_is_normalized_from_subcategory(self) -> None:
         product = ParsedProduct(
             source="sewitnow",

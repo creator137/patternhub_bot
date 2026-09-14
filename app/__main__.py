@@ -23,6 +23,16 @@ def build_parser() -> argparse.ArgumentParser:
     set_parser.add_argument("chat_id", type=int)
     parse_parser = subparsers.add_parser("parse", help="synchronize a catalog source")
     parse_parser.add_argument("source", choices=available_providers())
+    parse_parser.add_argument(
+        "--enrich-details",
+        action="store_true",
+        help="fetch product detail pages when the provider supports it",
+    )
+    parse_parser.add_argument(
+        "--detail-limit",
+        type=positive_int,
+        help="limit detail pages fetched with --enrich-details",
+    )
     subparsers.add_parser("catalog-stats", help="show catalog statistics")
     products_parser = subparsers.add_parser("products", help="show saved products")
     products_parser.add_argument("--limit", type=positive_int, default=10)
@@ -125,7 +135,11 @@ def main() -> None:
         configure_logging()
         stats = asyncio.run(
             CatalogService(product_repository()).synchronize(
-                create_provider(args.source)
+                create_provider(
+                    args.source,
+                    enrich_details=args.enrich_details,
+                    detail_limit=args.detail_limit,
+                )
             )
         )
         print(

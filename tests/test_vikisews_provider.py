@@ -47,6 +47,51 @@ class VikiSewsProviderTests(unittest.TestCase):
         self.assertEqual(product.difficulty, "Средний уровень")
         self.assertEqual(product.image_url, "https://cdn.example/gloria.jpg")
 
+    def test_detail_materials_mark_knit_only_when_recommended(self) -> None:
+        html = """
+        <html><body>
+          <script type="application/ld+json">
+            {"@type": "Product", "name": "Гелла футболка", "offers": {"price": "300"}}
+          </script>
+          <div id="headingOne">
+            <button class="accordion" data-target="#collapseOne">Рекомендуемые материалы</button>
+          </div>
+          <div id="collapseOne"><div class="panel">
+            Для пошива футболки подойдут трикотажные полотна: кулирная гладь.
+          </div></div>
+        </body></html>
+        """
+
+        product = self.provider.parse_product_page(
+            html,
+            "https://vikisews.com/vykrojki/khudi-futbolki-longslivy/gella-futbolka/",
+        )
+
+        self.assertTrue(product.is_knit)
+
+    def test_detail_materials_do_not_mark_negative_knit_mentions(self) -> None:
+        html = """
+        <html><body>
+          <script type="application/ld+json">
+            {"@type": "Product", "name": "Аглая платье", "offers": {"price": "300"}}
+          </script>
+          <div id="headingOne">
+            <button class="accordion" data-target="#collapseOne">Рекомендуемые материалы</button>
+          </div>
+          <div id="collapseOne"><div class="panel">
+            Для пошива подойдут нерастяжимые плательные ткани.
+            Внимание! Не рекомендуются трикотажные полотна.
+          </div></div>
+        </body></html>
+        """
+
+        product = self.provider.parse_product_page(
+            html,
+            "https://vikisews.com/vykrojki/platja-i-sarafany/aglaja-plate/",
+        )
+
+        self.assertFalse(product.is_knit)
+
     def test_vikisews_men_and_kids_keep_product_category(self) -> None:
         men = ParsedProductLike(
             audience=self.provider._audience_from_url(

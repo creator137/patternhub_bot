@@ -38,6 +38,24 @@ def _has_text_marker(values: tuple[str | None, ...], markers: tuple[str, ...]) -
     return any(marker in text for marker in markers)
 
 
+def _has_beginner_marker(values: tuple[str | None, ...]) -> bool:
+    text = " ".join(value or "" for value in values).casefold().replace("ё", "е")
+    markers = (
+        "для начинающих",
+        "начинающий",
+        "начинающим",
+        "начальный уровень",
+        "легкий уровень",
+        "простая выкройка",
+        "простая модель",
+        "простое изделие",
+        "уровень сложности: 1",
+        "сложность: 1",
+        "difficulty: 1",
+    )
+    return any(marker in text for marker in markers)
+
+
 @dataclass(frozen=True, slots=True)
 class ParsedProduct:
     source: str
@@ -82,9 +100,8 @@ class ParsedProduct:
         category = normalize_category(self.category)
         difficulty = _clean_text(self.difficulty)
         description = _clean_text(self.description)
-        is_beginner = self.is_beginner or _has_text_marker(
-            (difficulty, description, name, subcategory),
-            ("начинающ", "легк", "простой", "простая"),
+        is_beginner = self.is_beginner or _has_beginner_marker(
+            (difficulty, description, name, subcategory)
         )
         is_knit = self.is_knit or _has_text_marker(
             (category, subcategory, description, name),

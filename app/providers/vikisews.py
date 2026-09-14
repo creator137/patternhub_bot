@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from time import monotonic
 from urllib.parse import urljoin
@@ -46,12 +47,16 @@ class VikiSewsProvider(BaseProvider):
         max_pages: int = 200,
         retries: int = 3,
         page_size: int = 24,
+        enrich_details: bool = False,
+        detail_limit: int | None = None,
     ) -> None:
         self.request_delay = request_delay
         self.timeout = timeout
         self.max_pages = max_pages
         self.retries = retries
         self.page_size = page_size
+        self.enrich_details = enrich_details
+        self.detail_limit = detail_limit
         self._last_request_started: float | None = None
 
     async def fetch_products(self) -> ProviderResult:
@@ -112,6 +117,44 @@ class VikiSewsProvider(BaseProvider):
             else:
                 logger.warning("VikiSews parser reached max_pages=%d", self.max_pages)
                 errors += 1
+
+            if self.enrich_details and errors == 0:
+                detail_products = list(products_by_key.values())
+                if self.detail_limit is not None:
+                    detail_products = detail_products[: self.detail_limit]
+                for index, product in enumerate(detail_products, start=1):
+                    html = await self._get_page(client, product.product_url)
+                    if html is None:
+                        errors += 1
+                        logger.warning(
+                            "Could not fetch VikiSews detail page %s",
+                            product.product_url,
+                        )
+                        continue
+                    try:
+                        detailed = self.parse_product_page(
+                            html,
+                            product.product_url,
+                            product,
+                        )
+                    except Exception as error:  # noqa: BLE001
+                        errors += 1
+                        logger.warning(
+                            "Could not parse VikiSews detail page %s: %s",
+                            product.product_url,
+                            error,
+                        )
+                        continue
+                    key = detailed.source_product_id or detailed.product_url
+                    products_by_key[key] = self._merge_product(product, detailed)
+                    logger.info(
+                        "VikiSews detail page %d/%d: %s beginner=%s knit=%s",
+                        index,
+                        len(detail_products),
+                        product.product_url,
+                        products_by_key[key].is_beginner,
+                        products_by_key[key].is_knit,
+                    )
 
         return ProviderResult(list(products_by_key.values()), errors, complete=errors == 0)
 
@@ -230,6 +273,9 @@ class VikiSewsProvider(BaseProvider):
             "a", string=re.compile(r"уровень|beginner|advanced", re.IGNORECASE)
         )
         description_node = soup.select_one('meta[name="description"]')
+        materials_text = self._recommended_materials_text(soup)
+        detail_tags = self._detail_tags(soup)
+        is_knit = self._is_knit_product(materials_text, detail_tags)
 
         base = seed or ParsedProduct(
             source=self.source,
@@ -252,6 +298,9 @@ class VikiSewsProvider(BaseProvider):
             currency=str(offers.get("priceCurrency") or base.currency or "RUB"),
             is_sale=base.is_sale,
             is_free=base.is_free,
+            is_new=base.is_new,
+            is_beginner=base.is_beginner,
+            is_knit=base.is_knit or is_knit,
             sizes=sizes or base.sizes,
             heights=heights or base.heights,
             difficulty=(
@@ -268,6 +317,19 @@ class VikiSewsProvider(BaseProvider):
             image_url=str(image_url) if image_url else base.image_url,
             is_available=base.is_available,
             source_updated_at=base.source_updated_at,
+        ).normalized()
+
+    @staticmethod
+    def _merge_product(existing: ParsedProduct, product: ParsedProduct) -> ParsedProduct:
+        return replace(
+            product,
+            is_sale=existing.is_sale or product.is_sale,
+            is_free=existing.is_free or product.is_free,
+            is_new=existing.is_new or product.is_new,
+            is_beginner=existing.is_beginner or product.is_beginner,
+            is_knit=existing.is_knit or product.is_knit,
+            image_url=product.image_url or existing.image_url,
+            is_available=existing.is_available or product.is_available,
         ).normalized()
 
     @staticmethod
@@ -342,6 +404,72 @@ class VikiSewsProvider(BaseProvider):
             if any(marker in text for marker in markers):
                 return category
         return "Другое"
+
+    @staticmethod
+    def _recommended_materials_text(soup: BeautifulSoup) -> str | None:
+        for button in soup.select("button.accordion"):
+            header = button.get_text(" ", strip=True)
+            if "рекомендуемые материалы" not in header.casefold():
+                continue
+            target = str(button.get("data-target") or "").lstrip("#")
+            panel = soup.select_one(f"#{target} .panel") if target else None
+            if panel is None:
+                wrapper = button.find_parent()
+                panel = wrapper.find_next(class_="panel") if wrapper else None
+            if panel:
+                return panel.get_text(" ", strip=True)
+        return None
+
+    @staticmethod
+    def _detail_tags(soup: BeautifulSoup) -> tuple[str, ...]:
+        tags: list[str] = []
+        for node in soup.select(".tags a, .subtext .tags a"):
+            text = node.get_text(" ", strip=True)
+            if text:
+                tags.append(text)
+        return tuple(tags)
+
+    @staticmethod
+    def _is_knit_product(materials_text: str | None, tags: tuple[str, ...]) -> bool:
+        tag_text = " ".join(tags).casefold().replace("ё", "е")
+        if "трикотаж" in tag_text:
+            return True
+        text = (materials_text or "").casefold().replace("ё", "е")
+        if not text or "трикотаж" not in text:
+            return False
+        negative_patterns = (
+            "не рекомендуются",
+            "не рекомендуется",
+            "нерастяжимые",
+            "нерастяжимый",
+            "нерастяжимая",
+        )
+        positive_patterns = (
+            "подойдут трикотажные",
+            "подойдет трикотаж",
+            "рекомендуются трикотажные",
+            "рекомендуется трикотаж",
+            "трикотажные полотна",
+            "трикотажное полотно",
+            "кулирная гладь",
+            "кашкорсе",
+            "рибана",
+            "футер",
+            "интерлок",
+            "бифлекс",
+            "джерси",
+        )
+        sentences = re.split(r"(?<=[.!?])\s+|;", text)
+        for sentence in sentences:
+            if "трикотаж" not in sentence and not any(
+                marker in sentence for marker in positive_patterns[5:]
+            ):
+                continue
+            if any(marker in sentence for marker in negative_patterns):
+                continue
+            if any(marker in sentence for marker in positive_patterns):
+                return True
+        return False
 
     @staticmethod
     def _decimal(value: object) -> Decimal | None:
