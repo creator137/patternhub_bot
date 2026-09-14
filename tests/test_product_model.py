@@ -49,6 +49,27 @@ class ParsedProductTests(unittest.TestCase):
 
         self.assertIsNone(product.audience)
 
+    def test_beginner_flag_is_normalized_from_explicit_text(self) -> None:
+        product = ParsedProduct(
+            source="helpersew",
+            name="Платье",
+            product_url="https://helpersew.com/item/1",
+            difficulty="Уровень сложности: для начинающих",
+        ).normalized()
+
+        self.assertTrue(product.is_beginner)
+
+    def test_knit_flag_is_normalized_from_subcategory(self) -> None:
+        product = ParsedProduct(
+            source="sewitnow",
+            name="Платье",
+            product_url="https://sewitnow.ru/product/1/",
+            category="Платья",
+            subcategory="Платья из трикотажа",
+        ).normalized()
+
+        self.assertTrue(product.is_knit)
+
 
 if __name__ == "__main__":
     unittest.main()

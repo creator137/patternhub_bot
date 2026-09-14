@@ -33,6 +33,11 @@ def _clean_url(value: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, parts.query, ""))
 
 
+def _has_text_marker(values: tuple[str | None, ...], markers: tuple[str, ...]) -> bool:
+    text = " ".join(value or "" for value in values).casefold().replace("ё", "е")
+    return any(marker in text for marker in markers)
+
+
 @dataclass(frozen=True, slots=True)
 class ParsedProduct:
     source: str
@@ -49,6 +54,8 @@ class ParsedProduct:
     is_sale: bool = False
     is_free: bool = False
     is_new: bool = False
+    is_beginner: bool = False
+    is_knit: bool = False
     sizes: tuple[str, ...] | None = None
     heights: tuple[str, ...] | None = None
     difficulty: str | None = None
@@ -71,6 +78,18 @@ class ParsedProduct:
         )
         is_free = self.is_free or price == Decimal("0.00")
         is_sale = price is not None and old_price is not None and old_price > price
+        subcategory = _clean_text(self.subcategory)
+        category = normalize_category(self.category)
+        difficulty = _clean_text(self.difficulty)
+        description = _clean_text(self.description)
+        is_beginner = self.is_beginner or _has_text_marker(
+            (difficulty, description, name, subcategory),
+            ("начинающ", "легк", "простой", "простая"),
+        )
+        is_knit = self.is_knit or _has_text_marker(
+            (category, subcategory, description, name),
+            ("трикотаж",),
+        )
         return replace(
             self,
             source=source,
@@ -78,18 +97,20 @@ class ParsedProduct:
             name=name,
             brand=_clean_text(self.brand),
             audience=normalize_audience(self.audience),
-            category=normalize_category(self.category),
-            subcategory=_clean_text(self.subcategory),
+            category=category,
+            subcategory=subcategory,
             price=price,
             old_price=old_price,
             currency=(_clean_text(self.currency) or "").upper() or None,
             is_sale=is_sale,
             is_free=is_free,
             is_new=bool(self.is_new),
+            is_beginner=is_beginner,
+            is_knit=is_knit,
             sizes=_clean_values(self.sizes),
             heights=_clean_values(self.heights),
-            difficulty=_clean_text(self.difficulty),
-            description=_clean_text(self.description),
+            difficulty=difficulty,
+            description=description,
             product_url=_clean_url(self.product_url),
             image_url=_clean_url(self.image_url) if self.image_url else None,
         )
@@ -111,6 +132,8 @@ class Product:
     is_sale: bool
     is_free: bool
     is_new: bool
+    is_beginner: bool
+    is_knit: bool
     sizes: tuple[str, ...] | None
     heights: tuple[str, ...] | None
     difficulty: str | None
@@ -175,6 +198,8 @@ class CatalogStats:
     on_sale: int
     new: int
     free: int
+    beginner: int
+    knit: int
     categories: int
     no_price: int
     no_image: int

@@ -90,6 +90,8 @@ def main() -> None:
         print(f"\nOn sale: {stats.on_sale}")
         print(f"New: {stats.new}")
         print(f"Free: {stats.free}")
+        print(f"Beginner: {stats.beginner}")
+        print(f"Knit: {stats.knit}")
         print(f"Categories: {stats.categories}")
         print(f"No price: {stats.no_price}")
         print(f"No image: {stats.no_image}")

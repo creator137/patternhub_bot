@@ -173,6 +173,8 @@ class ProductRepository:
                        COALESCE(SUM(is_sale), 0) AS on_sale,
                        COALESCE(SUM(is_new), 0) AS new,
                        COALESCE(SUM(is_free), 0) AS free,
+                       COALESCE(SUM(is_beginner), 0) AS beginner,
+                       COALESCE(SUM(is_knit), 0) AS knit,
                        COUNT(DISTINCT category) AS categories,
                        COALESCE(SUM(price IS NULL), 0) AS no_price,
                        COALESCE(SUM(image_url IS NULL), 0) AS no_image
@@ -221,6 +223,8 @@ class ProductRepository:
             on_sale=totals["on_sale"],
             new=totals["new"],
             free=totals["free"],
+            beginner=totals["beginner"],
+            knit=totals["knit"],
             categories=totals["categories"],
             no_price=totals["no_price"],
             no_image=totals["no_image"],
@@ -336,29 +340,11 @@ class ProductRepository:
                 clauses.append("is_new = ?")
                 parameters.append(int(filters.is_new))
             if filters.is_beginner is not None:
-                beginner_clause, beginner_parameters = ProductRepository._text_filter_clause(
-                    (
-                        "difficulty",
-                        "description",
-                        "name",
-                        "subcategory",
-                    ),
-                    ("начинающ", "легк", "простой", "простая"),
-                )
-                clauses.append(beginner_clause if filters.is_beginner else f"NOT ({beginner_clause})")
-                parameters.extend(beginner_parameters)
+                clauses.append("is_beginner = ?")
+                parameters.append(int(filters.is_beginner))
             if filters.is_knit is not None:
-                knit_clause, knit_parameters = ProductRepository._text_filter_clause(
-                    (
-                        "category",
-                        "subcategory",
-                        "description",
-                        "name",
-                    ),
-                    ("трикотаж",),
-                )
-                clauses.append(knit_clause if filters.is_knit else f"NOT ({knit_clause})")
-                parameters.extend(knit_parameters)
+                clauses.append("is_knit = ?")
+                parameters.append(int(filters.is_knit))
         return f"WHERE {' AND '.join(clauses)}", tuple(parameters)
 
     @staticmethod
@@ -406,6 +392,8 @@ class ProductRepository:
             "is_sale": int(product.is_sale),
             "is_free": int(product.is_free),
             "is_new": int(product.is_new),
+            "is_beginner": int(product.is_beginner),
+            "is_knit": int(product.is_knit),
             "sizes": json.dumps(product.sizes, ensure_ascii=False) if product.sizes else None,
             "heights": json.dumps(product.heights, ensure_ascii=False) if product.heights else None,
             "difficulty": product.difficulty,
@@ -439,6 +427,8 @@ class ProductRepository:
             is_sale=bool(row["is_sale"]),
             is_free=bool(row["is_free"]),
             is_new=bool(row["is_new"]),
+            is_beginner=bool(row["is_beginner"]),
+            is_knit=bool(row["is_knit"]),
             sizes=tuple(json.loads(row["sizes"])) if row["sizes"] else None,
             heights=tuple(json.loads(row["heights"])) if row["heights"] else None,
             difficulty=row["difficulty"],

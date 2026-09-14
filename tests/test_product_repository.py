@@ -168,6 +168,9 @@ class ProductRepositoryTests(unittest.TestCase):
 
         self.assertEqual([item.source_product_id for item in beginner], ["1"])
         self.assertEqual([item.source_product_id for item in knit], ["2"])
+        stats = self.repository.stats()
+        self.assertEqual(stats.beginner, 1)
+        self.assertEqual(stats.knit, 1)
 
 
 if __name__ == "__main__":

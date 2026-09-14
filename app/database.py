@@ -45,6 +45,8 @@ class Database:
                     is_sale INTEGER NOT NULL DEFAULT 0,
                     is_free INTEGER NOT NULL DEFAULT 0,
                     is_new INTEGER NOT NULL DEFAULT 0,
+                    is_beginner INTEGER NOT NULL DEFAULT 0,
+                    is_knit INTEGER NOT NULL DEFAULT 0,
                     sizes TEXT,
                     heights TEXT,
                     difficulty TEXT,
@@ -71,10 +73,45 @@ class Database:
             self._ensure_column(connection, "products", "audience", "TEXT")
             self._ensure_column(connection, "products", "telegram_file_id", "TEXT")
             self._ensure_column(connection, "products", "image_status", "TEXT")
+            self._ensure_column(
+                connection, "products", "is_beginner", "INTEGER NOT NULL DEFAULT 0"
+            )
+            self._ensure_column(
+                connection, "products", "is_knit", "INTEGER NOT NULL DEFAULT 0"
+            )
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_products_flags
-                    ON products(is_sale, is_free, is_new)
+                    ON products(is_sale, is_free, is_new, is_beginner, is_knit)
+                """
+            )
+            connection.execute(
+                """
+                UPDATE products
+                SET is_beginner = CASE
+                        WHEN lower(coalesce(difficulty, '') || ' ' ||
+                                   coalesce(description, '') || ' ' ||
+                                   coalesce(name, '') || ' ' ||
+                                   coalesce(subcategory, '')) LIKE '%начинающ%'
+                          OR lower(coalesce(difficulty, '') || ' ' ||
+                                   coalesce(description, '') || ' ' ||
+                                   coalesce(name, '') || ' ' ||
+                                   coalesce(subcategory, '')) LIKE '%легк%'
+                          OR lower(coalesce(difficulty, '') || ' ' ||
+                                   coalesce(description, '') || ' ' ||
+                                   coalesce(name, '') || ' ' ||
+                                   coalesce(subcategory, '')) LIKE '%простой%'
+                          OR lower(coalesce(difficulty, '') || ' ' ||
+                                   coalesce(description, '') || ' ' ||
+                                   coalesce(name, '') || ' ' ||
+                                   coalesce(subcategory, '')) LIKE '%простая%'
+                        THEN 1 ELSE is_beginner END,
+                    is_knit = CASE
+                        WHEN lower(coalesce(category, '') || ' ' ||
+                                   coalesce(subcategory, '') || ' ' ||
+                                   coalesce(description, '') || ' ' ||
+                                   coalesce(name, '')) LIKE '%трикотаж%'
+                        THEN 1 ELSE is_knit END
                 """
             )
             connection.execute(
