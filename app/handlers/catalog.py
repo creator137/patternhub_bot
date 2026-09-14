@@ -237,7 +237,7 @@ async def show_category_callback(
     catalog_service: CatalogService,
     callback_data: CategoryCallback,
 ) -> None:
-    await callback.answer()
+    await safe_callback_answer(callback)
     await send_product_card(
         callback.message,
         catalog_service,
@@ -257,7 +257,7 @@ async def handle_product_callback(
     if callback_data.action in {"next", "prev"}:
         async with ACTIVE_PRODUCT_CALLBACKS_LOCK:
             if busy_key in ACTIVE_PRODUCT_CALLBACKS:
-                await callback.answer("Загружаю карточку...")
+                await safe_callback_answer(callback, "Загружаю карточку...")
                 return
             ACTIVE_PRODUCT_CALLBACKS.add(busy_key)
         try:
@@ -276,7 +276,7 @@ async def handle_product_callback_once(
     callback_data: ProductCallback,
 ) -> None:
     if callback_data.action == "back":
-        await callback.answer()
+        await safe_callback_answer(callback)
         filters = section_filters(callback_data.section, callback_data.quick_filter)
         categories = await catalog_service.get_categories(filters=filters)
         if callback.message:
@@ -296,7 +296,7 @@ async def handle_product_callback_once(
         filters=section_filter,
     )
     if category is None:
-        await callback.answer("Категория больше недоступна.", show_alert=True)
+        await safe_callback_answer(callback, "Категория больше недоступна.", show_alert=True)
         return
 
     filters = product_filters(
@@ -306,15 +306,15 @@ async def handle_product_callback_once(
     )
     total = await catalog_service.count_products(filters)
     if total == 0:
-        await callback.answer("Сейчас товаров в этом разделе нет.", show_alert=True)
+        await safe_callback_answer(callback, "Сейчас товаров в этом разделе нет.", show_alert=True)
         return
 
     if callback_data.action == "details":
         product = await product_at(catalog_service, filters, callback_data.index)
         if product is None:
-            await callback.answer("Товар больше недоступен.", show_alert=True)
+            await safe_callback_answer(callback, "Товар больше недоступен.", show_alert=True)
             return
-        await callback.answer()
+        await safe_callback_answer(callback)
         if callback.message:
             await callback.message.answer(format_product_details(product), parse_mode="HTML")
         return
@@ -325,7 +325,7 @@ async def handle_product_callback_once(
     elif callback_data.action == "prev":
         next_index = (callback_data.index - 1) % total
 
-    await callback.answer()
+    await safe_callback_answer(callback)
     if callback.message:
         await send_product_card(
             callback.message,
@@ -466,6 +466,23 @@ async def product_at(
 ) -> Product | None:
     products = await catalog_service.get_products(limit=1, offset=index, filters=filters)
     return products[0] if products else None
+
+
+async def safe_callback_answer(
+    callback: CallbackQuery,
+    text: str | None = None,
+    *,
+    show_alert: bool | None = None,
+) -> None:
+    try:
+        if text is None and show_alert is None:
+            await callback.answer()
+        elif show_alert is None:
+            await callback.answer(text)
+        else:
+            await callback.answer(text, show_alert=show_alert)
+    except TelegramAPIError:
+        logger.debug("Could not answer Telegram callback", exc_info=True)
 
 
 def section_filters(section: str, quick_filter: str = FILTER_ALL) -> ProductFilter:
@@ -744,7 +761,7 @@ def create_catalog_router(catalog_service: CatalogService) -> Router:
 
     @router.callback_query(SectionCallback.filter(F.section == "home"))
     async def bound_home_callback(callback: CallbackQuery) -> None:
-        await callback.answer()
+        await safe_callback_answer(callback)
         if callback.message:
             await show_main_menu(callback.message, catalog_service)
 
@@ -752,7 +769,7 @@ def create_catalog_router(catalog_service: CatalogService) -> Router:
     async def bound_section_callback(
         callback: CallbackQuery, callback_data: SectionCallback
     ) -> None:
-        await callback.answer()
+        await safe_callback_answer(callback)
         if callback.message:
             await show_section(callback.message, catalog_service, callback_data.section)
 
@@ -760,7 +777,7 @@ def create_catalog_router(catalog_service: CatalogService) -> Router:
     async def bound_section_filter(
         callback: CallbackQuery, callback_data: SectionFilterCallback
     ) -> None:
-        await callback.answer()
+        await safe_callback_answer(callback)
         if callback.message:
             await show_section(
                 callback.message,
@@ -781,6 +798,6 @@ def create_catalog_router(catalog_service: CatalogService) -> Router:
 
     @router.callback_query(F.data == "noop")
     async def bound_noop(callback: CallbackQuery) -> None:
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     return router

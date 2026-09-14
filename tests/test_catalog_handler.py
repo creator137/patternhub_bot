@@ -23,6 +23,7 @@ from app.handlers.catalog import (
     product_filters,
     product_photo_file_id,
     quick_filter_button_text,
+    safe_callback_answer,
     send_product_card,
     show_brands,
     show_main_menu,
@@ -226,6 +227,20 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         first_callback.answer.assert_awaited_once_with()
         second_callback.answer.assert_awaited_once_with("Загружаю карточку...")
+
+    async def test_expired_callback_answer_does_not_crash_handler(self) -> None:
+        callback = SimpleNamespace(
+            answer=AsyncMock(
+                side_effect=TelegramAPIError(
+                    method=SimpleNamespace(),
+                    message="query is too old and response timeout expired",
+                )
+            )
+        )
+
+        await safe_callback_answer(callback)
+
+        callback.answer.assert_awaited_once_with()
 
     async def test_product_without_image_uses_text_message(self) -> None:
         category = (await self.service.get_categories(section="women"))[0]
