@@ -42,9 +42,9 @@ def product(
 class ProductRepositoryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_directory = tempfile.TemporaryDirectory()
-        database = Database(Path(self.temp_directory.name) / "catalog.sqlite3")
-        database.initialize()
-        self.repository = ProductRepository(database)
+        self.database = Database(Path(self.temp_directory.name) / "catalog.sqlite3")
+        self.database.initialize()
+        self.repository = ProductRepository(self.database)
 
     def tearDown(self) -> None:
         self.temp_directory.cleanup()
@@ -171,6 +171,23 @@ class ProductRepositoryTests(unittest.TestCase):
         stats = self.repository.stats()
         self.assertEqual(stats.beginner, 1)
         self.assertEqual(stats.knit, 1)
+
+    def test_database_initialize_does_not_backfill_knit_from_description(self) -> None:
+        self.repository.upsert_many(
+            [
+                product(
+                    source_product_id="technical",
+                    category="Брюки и шорты",
+                    subcategory="Брюки",
+                    description="Для пояса подойдет дублерин на трикотажной основе.",
+                )
+            ]
+        )
+
+        self.database.initialize()
+
+        saved = self.repository.list_products()[0]
+        self.assertFalse(saved.is_knit)
 
 
 if __name__ == "__main__":

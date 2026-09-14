@@ -87,35 +87,6 @@ class Database:
             )
             connection.execute(
                 """
-                UPDATE products
-                SET is_beginner = CASE
-                        WHEN lower(coalesce(difficulty, '') || ' ' ||
-                                   coalesce(description, '') || ' ' ||
-                                   coalesce(name, '') || ' ' ||
-                                   coalesce(subcategory, '')) LIKE '%начинающ%'
-                          OR lower(coalesce(difficulty, '') || ' ' ||
-                                   coalesce(description, '') || ' ' ||
-                                   coalesce(name, '') || ' ' ||
-                                   coalesce(subcategory, '')) LIKE '%легк%'
-                          OR lower(coalesce(difficulty, '') || ' ' ||
-                                   coalesce(description, '') || ' ' ||
-                                   coalesce(name, '') || ' ' ||
-                                   coalesce(subcategory, '')) LIKE '%простой%'
-                          OR lower(coalesce(difficulty, '') || ' ' ||
-                                   coalesce(description, '') || ' ' ||
-                                   coalesce(name, '') || ' ' ||
-                                   coalesce(subcategory, '')) LIKE '%простая%'
-                        THEN 1 ELSE is_beginner END,
-                    is_knit = CASE
-                        WHEN lower(coalesce(category, '') || ' ' ||
-                                   coalesce(subcategory, '') || ' ' ||
-                                   coalesce(description, '') || ' ' ||
-                                   coalesce(name, '')) LIKE '%трикотаж%'
-                        THEN 1 ELSE is_knit END
-                """
-            )
-            connection.execute(
-                """
                 CREATE INDEX IF NOT EXISTS idx_products_audience_category
                     ON products(audience, category)
                 """
