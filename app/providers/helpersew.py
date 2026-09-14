@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin, urlsplit
 
@@ -21,8 +22,19 @@ class HelperSewProvider(BaseProvider):
     source = "helpersew"
     base_url = "https://helpersew.com"
 
-    category_pages: tuple[tuple[str, str, str | None], ...] = (
+    category_pages: tuple[
+        tuple[str, str, str | None] | tuple[str, str, str | None, bool, bool],
+        ...,
+    ] = (
         ("/catalog/zhenskie/", "women", None),
+        (
+            "/catalog/zhenskie/zhenskie-vykroyki-dlya-nachinayushchikh/",
+            "women",
+            None,
+            True,
+            False,
+        ),
+        ("/catalog/zhenskie/vykroyki-iz-trikotazha/", "women", None, False, True),
         ("/catalog/zhenskie/bryuki/", "women", "Брюки"),
         ("/catalog/zhenskie/palto-i-zhakety/", "women", "Верхняя одежда"),
         ("/catalog/zhenskie/vodolazki-i-longslivy/", "women", "Водолазки и лонгсливы"),
@@ -39,14 +51,35 @@ class HelperSewProvider(BaseProvider):
         ("/catalog/zhenskie/shorty/", "women", "Шорты"),
         ("/catalog/zhenskie/yubki/", "women", "Юбки"),
         ("/catalog/muzhskie/", "men", None),
+        (
+            "/catalog/muzhskie/muzhskie-vykroyki-dlya-nachinayushchikh/",
+            "men",
+            None,
+            True,
+            False,
+        ),
         ("/catalog/muzhskie/verkhnyaya-odezhda-dlya-muzhchin/", "men", "Верхняя одежда"),
-        ("/catalog/muzhskie/vykroyki-iz-trikotazha-men/", "men", "Выкройки из трикотажа"),
+        (
+            "/catalog/muzhskie/vykroyki-iz-trikotazha-men/",
+            "men",
+            None,
+            False,
+            True,
+        ),
         ("/catalog/muzhskie/bryukimen/", "men", "Брюки"),
         ("/catalog/muzhskie/rubashki-/", "men", "Рубашки"),
         ("/catalog/muzhskie/svitshoty-tolstovki-khudi/", "men", "Свитшоты, толстовки, худи"),
         ("/catalog/muzhskie/futbolki-men/", "men", "Футболки"),
         ("/catalog/muzhskie/shorty-men/", "men", "Шорты"),
         ("/catalog/podrostki/", "kids", None),
+        ("/catalog/podrostki/dlya-nachinayushchikh/", "kids", None, True, False),
+        (
+            "/catalog/podrostki/vykroyki-iz-trikotazha-teenager/",
+            "kids",
+            None,
+            False,
+            True,
+        ),
         ("/catalog/podrostki/bryuki-teenager/", "kids", "Брюки"),
         ("/catalog/podrostki/verkhnyaya-odezhda/", "kids", "Верхняя одежда"),
         ("/catalog/podrostki/platya-teenager/", "kids", "Платья"),
@@ -55,6 +88,14 @@ class HelperSewProvider(BaseProvider):
         ("/catalog/podrostki/svitshoty-tolstovki-khudi-teenager/", "kids", "Свитшоты, толстовки, худи"),
         ("/catalog/podrostki/yubki-teenager/", "kids", "Юбки"),
         ("/catalog/detskie/", "kids", None),
+        (
+            "/catalog/detskie/detskie-vykroyki-dlya-nachinayushchikh/",
+            "kids",
+            None,
+            True,
+            False,
+        ),
+        ("/catalog/detskie/vykroyki-iz-trikotazha-deti/", "kids", None, False, True),
         ("/catalog/detskie/detskie-bryuki/", "kids", "Брюки"),
         ("/catalog/detskie/detskie-zhilety/", "kids", "Жилеты"),
         ("/catalog/detskie/kombinezony/", "kids", "Комбинезоны"),
@@ -99,7 +140,10 @@ class HelperSewProvider(BaseProvider):
         async with httpx.AsyncClient(
             headers=headers, timeout=timeout, follow_redirects=True, trust_env=False
         ) as client:
-            for path, audience, category in pages:
+            for page_config in pages:
+                path, audience, category, is_beginner, is_knit = self._page_config(
+                    page_config
+                )
                 page_url = urljoin(self.base_url, path)
                 html = await self._get_page(client, page_url)
                 if html is None:
@@ -107,7 +151,12 @@ class HelperSewProvider(BaseProvider):
                     continue
                 try:
                     page_products = self.parse_catalog_page(
-                        html, page_url, page_audience=audience, page_category=category
+                        html,
+                        page_url,
+                        page_audience=audience,
+                        page_category=category,
+                        page_is_beginner=is_beginner,
+                        page_is_knit=is_knit,
                     )
                     skipped += self.last_skipped
                 except Exception as error:  # noqa: BLE001
@@ -122,7 +171,12 @@ class HelperSewProvider(BaseProvider):
                     key = product.source_product_id or product.product_url
                     if key not in products_by_key:
                         new_count += 1
-                    products_by_key[key] = product
+                        products_by_key[key] = product
+                    else:
+                        products_by_key[key] = self._merge_product(
+                            products_by_key[key],
+                            product,
+                        )
                 logger.info(
                     "HelperSew page %s: parsed=%d new=%d",
                     page_url,
@@ -163,6 +217,8 @@ class HelperSewProvider(BaseProvider):
         page_url: str,
         page_audience: str | None = None,
         page_category: str | None = None,
+        page_is_beginner: bool = False,
+        page_is_knit: bool = False,
     ) -> list[ParsedProduct]:
         soup = BeautifulSoup(html, "html.parser")
         products: list[ParsedProduct] = []
@@ -171,7 +227,14 @@ class HelperSewProvider(BaseProvider):
 
         for card in soup.select(".cat-card"):
             try:
-                product = self._parse_card(card, page_url, page_audience, page_category)
+                product = self._parse_card(
+                    card,
+                    page_url,
+                    page_audience,
+                    page_category,
+                    page_is_beginner,
+                    page_is_knit,
+                )
             except (ValueError, TypeError, AttributeError) as error:
                 logger.warning("Could not parse HelperSew product card on %s: %s", page_url, error)
                 continue
@@ -250,6 +313,8 @@ class HelperSewProvider(BaseProvider):
         page_url: str,
         page_audience: str | None,
         page_category: str | None,
+        page_is_beginner: bool,
+        page_is_knit: bool,
     ) -> ParsedProduct:
         name_node = card.select_one(".cat-card__name[href]")
         if not isinstance(name_node, Tag):
@@ -274,9 +339,31 @@ class HelperSewProvider(BaseProvider):
             is_sale="sale" in labels,
             is_free=price == Decimal("0.00"),
             is_new="new" in labels,
+            is_beginner=page_is_beginner,
+            is_knit=page_is_knit,
             product_url=product_url,
             image_url=self._extract_image_url(card, page_url),
             is_available="скоро" not in card.get_text(" ", strip=True).casefold(),
+        ).normalized()
+
+    @staticmethod
+    def _page_config(
+        config: tuple[str, str, str | None] | tuple[str, str, str | None, bool, bool],
+    ) -> tuple[str, str, str | None, bool, bool]:
+        if len(config) == 3:
+            path, audience, category = config
+            return path, audience, category, False, False
+        return config
+
+    @staticmethod
+    def _merge_product(existing: ParsedProduct, product: ParsedProduct) -> ParsedProduct:
+        return replace(
+            product,
+            is_sale=existing.is_sale or product.is_sale,
+            is_free=existing.is_free or product.is_free,
+            is_new=existing.is_new or product.is_new,
+            is_beginner=existing.is_beginner or product.is_beginner,
+            is_knit=existing.is_knit or product.is_knit,
         ).normalized()
 
     @classmethod

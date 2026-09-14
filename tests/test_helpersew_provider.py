@@ -54,6 +54,53 @@ class HelperSewProviderTests(unittest.TestCase):
         self.assertEqual(unisex.audience, "unisex")
         self.assertEqual(self.provider.last_skipped, 1)
 
+    def test_parses_beginner_and_knit_listing_flags(self) -> None:
+        html = (FIXTURES / "helpersew_catalog.html").read_text(encoding="utf-8")
+
+        beginner = self.provider.parse_catalog_page(
+            html,
+            "https://helpersew.com/catalog/zhenskie/zhenskie-vykroyki-dlya-nachinayushchikh/",
+            page_audience="women",
+            page_category=None,
+            page_is_beginner=True,
+        )
+        knit = self.provider.parse_catalog_page(
+            html,
+            "https://helpersew.com/catalog/detskie/vykroyki-iz-trikotazha-deti/",
+            page_audience="kids",
+            page_category=None,
+            page_is_knit=True,
+        )
+
+        self.assertTrue(all(product.is_beginner for product in beginner))
+        self.assertTrue(all(product.is_knit for product in knit))
+        self.assertEqual(knit[0].audience, "kids")
+
+    def test_duplicate_flags_are_merged(self) -> None:
+        plain = ParsedProduct(
+            source="helpersew",
+            source_product_id="1034345",
+            name="Платье Флоранс",
+            brand="HelperSew",
+            audience="women",
+            category="Платья",
+            product_url="https://helpersew.com/catalog/zhenskie/platya-i-sarafany/plate-florans/",
+        ).normalized()
+        beginner = ParsedProduct(
+            source="helpersew",
+            source_product_id="1034345",
+            name="Платье Флоранс",
+            brand="HelperSew",
+            audience="women",
+            category="Платья",
+            is_beginner=True,
+            product_url="https://helpersew.com/catalog/zhenskie/platya-i-sarafany/plate-florans/",
+        ).normalized()
+
+        merged = self.provider._merge_product(plain, beginner)
+
+        self.assertTrue(merged.is_beginner)
+
     def test_parses_optional_detail_fields(self) -> None:
         html = (FIXTURES / "helpersew_product.html").read_text(encoding="utf-8")
 
