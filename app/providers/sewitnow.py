@@ -136,31 +136,53 @@ class SewItNowProvider(BaseProvider):
                 pages = pages[: self.max_groups]
 
             for page_context in pages:
-                page_url = self.catalog_context_data_url(build_id, page_context)
-                payload = await self._get_json(client, page_url)
+                first_page_url = self.catalog_context_data_url(build_id, page_context)
+                payload = await self._get_json(client, first_page_url)
                 if not isinstance(payload, dict):
                     errors += 1
                     continue
-                try:
-                    page_products, page_skipped = self.parse_catalog_payload(
-                        payload,
-                        category_index,
+                page_count = self.page_count(payload)
+                page_payloads = [(first_page_url, payload)]
+                for page_number in range(2, page_count + 1):
+                    page_url = self.catalog_context_data_url(
+                        build_id,
                         page_context,
+                        page=page_number,
                     )
-                except Exception as error:  # noqa: BLE001
-                    errors += 1
-                    logger.exception("Could not parse SewItNow page %s: %s", page_url, error)
-                    continue
+                    page_payload = await self._get_json(client, page_url)
+                    if not isinstance(page_payload, dict):
+                        errors += 1
+                        self._mark_incomplete_page(page_context, page_count, 0)
+                        continue
+                    page_payloads.append((page_url, page_payload))
 
-                skipped += page_skipped
-                for product in page_products:
-                    products_by_key[product.source_product_id or product.product_url] = product
-                logger.info(
-                    "SewItNow page %s: parsed=%d skipped=%d",
-                    page_context.slug,
-                    len(page_products),
-                    page_skipped,
-                )
+                for page_url, page_payload in page_payloads:
+                    try:
+                        page_products, page_skipped = self.parse_catalog_payload(
+                            page_payload,
+                            category_index,
+                            page_context,
+                            track_incomplete=False,
+                        )
+                    except Exception as error:  # noqa: BLE001
+                        errors += 1
+                        self._mark_incomplete_page(page_context, page_count, 0)
+                        logger.exception(
+                            "Could not parse SewItNow page %s: %s", page_url, error
+                        )
+                        continue
+
+                    skipped += page_skipped
+                    for product in page_products:
+                        products_by_key[product.source_product_id or product.product_url] = (
+                            product
+                        )
+                    logger.info(
+                        "SewItNow page %s: parsed=%d skipped=%d",
+                        page_context.slug,
+                        len(page_products),
+                        page_skipped,
+                    )
 
         complete = errors == 0 and not self.incomplete_pages and self.max_groups is None
         if self.incomplete_pages:
@@ -214,10 +236,15 @@ class SewItNowProvider(BaseProvider):
         self,
         build_id: str,
         context: SewItNowCategoryContext,
+        page: int = 1,
     ) -> str:
         if context.parent_slug:
-            return self.catalog_data_url(build_id, f"{context.parent_slug}/{context.slug}")
-        return self.catalog_data_url(build_id, context.slug)
+            url = self.catalog_data_url(build_id, f"{context.parent_slug}/{context.slug}")
+        else:
+            url = self.catalog_data_url(build_id, context.slug)
+        if page > 1:
+            return f"{url}?page={page}"
+        return url
 
     @classmethod
     def parse_next_data(cls, html: str) -> dict[str, Any]:
@@ -313,16 +340,16 @@ class SewItNowProvider(BaseProvider):
         payload: dict[str, Any],
         category_index: dict[str, SewItNowCategoryContext],
         page_context: SewItNowCategoryContext,
+        *,
+        track_incomplete: bool = True,
     ) -> tuple[list[ParsedProduct], int]:
         page_props = payload.get("pageProps") or {}
         products_data = page_props.get("initGetProducts") or {}
         pages = self._int(products_data.get("pages")) or 0
         elements = self._int(products_data.get("elements")) or 0
-        if pages > 1:
-            marker = f"{page_context.slug} ({pages} pages, {elements} products)"
-            if marker not in self.incomplete_pages:
-                self.incomplete_pages.append(marker)
-        self.total_pages += max(pages, 1)
+        if track_incomplete and pages > 1:
+            self._mark_incomplete_page(page_context, pages, elements)
+        self.total_pages += 1
 
         parsed: list[ParsedProduct] = []
         skipped = 0
@@ -344,6 +371,22 @@ class SewItNowProvider(BaseProvider):
                 continue
             parsed.append(product)
         return parsed, skipped
+
+    @classmethod
+    def page_count(cls, payload: dict[str, Any]) -> int:
+        page_props = payload.get("pageProps") or {}
+        products_data = page_props.get("initGetProducts") or {}
+        return max(cls._int(products_data.get("pages")) or 1, 1)
+
+    def _mark_incomplete_page(
+        self,
+        page_context: SewItNowCategoryContext,
+        pages: int,
+        elements: int,
+    ) -> None:
+        marker = f"{page_context.slug} ({pages} pages, {elements} products)"
+        if marker not in self.incomplete_pages:
+            self.incomplete_pages.append(marker)
 
     def _parse_product(
         self,

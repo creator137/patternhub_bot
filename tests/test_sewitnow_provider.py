@@ -103,6 +103,13 @@ class SewItNowProviderTests(unittest.TestCase):
                 "platya-i-kombinezony-5503/kombinezony-33038.json"
             ),
         )
+        self.assertEqual(
+            self.provider.catalog_context_data_url("build-id", nested, page=2),
+            (
+                "https://sewitnow.ru/_next/data/build-id/catalog/"
+                "platya-i-kombinezony-5503/kombinezony-33038.json?page=2"
+            ),
+        )
 
     def test_incomplete_snapshot_detected_from_payload_pages(self) -> None:
         self.provider.parse_catalog_payload(
@@ -119,6 +126,23 @@ class SewItNowProviderTests(unittest.TestCase):
             self.provider.incomplete_pages,
             ["platya-i-kombinezony-5503 (2 pages, 25 products)"],
         )
+
+    def test_incomplete_tracking_can_be_disabled_when_pages_are_fetched(self) -> None:
+        self.provider.parse_catalog_payload(
+            self.payload,
+            self.category_index,
+            SewItNowCategoryContext(
+                id="5503",
+                name="Платья и комбинезоны",
+                slug="platya-i-kombinezony-5503",
+            ),
+            track_incomplete=False,
+        )
+
+        self.assertEqual(self.provider.incomplete_pages, [])
+
+    def test_page_count_reads_listing_pages(self) -> None:
+        self.assertEqual(self.provider.page_count(self.payload), 2)
 
     def test_price_parser(self) -> None:
         self.assertEqual(self.provider._decimal("1 200 ₽"), Decimal("1200"))
