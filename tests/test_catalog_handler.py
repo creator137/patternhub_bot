@@ -30,6 +30,8 @@ from app.handlers.catalog import (
     show_brands,
     show_main_menu,
     show_section,
+    source_from_section,
+    supports_quick_filters,
     telegram_photo_url,
 )
 from app.models.product import ParsedProduct, ProductFilter
@@ -109,6 +111,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
                     brand="Grasser",
                     audience="women",
                     category="Платья",
+                    subcategory="Платья из трикотажа",
                     price=Decimal("500"),
                     currency="RUB",
                     product_url="https://grasser.ru/vykrojki/plate/",
@@ -398,6 +401,15 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(beginner.is_beginner)
         self.assertTrue(knit.is_knit)
 
+    def test_product_filters_for_brand_fast_filters(self) -> None:
+        section = "src_grasser"
+        filters = product_filters(section, "Платья", "knit")
+
+        self.assertEqual(filters.source, "grasser")
+        self.assertTrue(filters.is_knit)
+        self.assertEqual(source_from_section(section), "grasser")
+        self.assertTrue(supports_quick_filters(section))
+
     def test_product_keyboard_has_no_details_button(self) -> None:
         keyboard = product_keyboard(
             "women",
@@ -428,6 +440,26 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("VikiSews", keyboard_text)
         self.assertIn("Grasser", keyboard_text)
 
+    async def test_brand_section_shows_fast_filter_buttons(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_section(message, self.service, "src_grasser")
+
+        keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("Для начинающих (0)", keyboard_text)
+        self.assertIn("Из трикотажа (1)", keyboard_text)
+
+    async def test_brand_knit_filter_limits_categories(self) -> None:
+        message = SimpleNamespace(answer=AsyncMock())
+
+        await show_section(message, self.service, "src_grasser", "knit")
+
+        text = message.answer.await_args.args[0]
+        keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
+        self.assertIn("Фильтр: Из трикотажа", text)
+        self.assertIn("Платья (1)", keyboard_text)
+        self.assertNotIn("Жакеты и жилеты", keyboard_text)
+
     async def test_women_section_shows_fast_filter_buttons(self) -> None:
         message = SimpleNamespace(answer=AsyncMock())
 
@@ -435,7 +467,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
         self.assertIn("Для начинающих (1)", keyboard_text)
-        self.assertIn("Из трикотажа (1)", keyboard_text)
+        self.assertIn("Из трикотажа (2)", keyboard_text)
 
     async def test_knit_filter_limits_categories(self) -> None:
         message = SimpleNamespace(answer=AsyncMock())

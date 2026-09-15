@@ -128,7 +128,7 @@ async def show_section(
     title = await section_title(catalog_service, section)
     filter_title = (
         f"\nФильтр: {QUICK_FILTER_TITLES[quick_filter]}"
-        if section in AUDIENCE_SECTIONS and quick_filter != FILTER_ALL
+        if supports_quick_filters(section) and quick_filter != FILTER_ALL
         else ""
     )
     quick_counts = await quick_filter_counts(catalog_service, section)
@@ -176,7 +176,7 @@ def categories_keyboard(
     quick_counts: dict[str, int] | None = None,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    if section in AUDIENCE_SECTIONS:
+    if supports_quick_filters(section):
         rows.extend(
             [
                 InlineKeyboardButton(
@@ -212,7 +212,7 @@ async def quick_filter_counts(
     catalog_service: CatalogService,
     section: str,
 ) -> dict[str, int]:
-    if section not in AUDIENCE_SECTIONS:
+    if not supports_quick_filters(section):
         return {}
     return {
         code: await catalog_service.count_products(section_filters(section, code))
@@ -229,6 +229,10 @@ def quick_filter_button_text(
     prefix = "✓ " if selected == code else ""
     suffix = f" ({counts[code]})" if counts and code in counts else ""
     return f"{prefix}{title}{suffix}"
+
+
+def supports_quick_filters(section: str) -> bool:
+    return section in AUDIENCE_SECTIONS or section.startswith(SOURCE_SECTION_PREFIX)
 
 
 class SectionFilterCallback(CallbackData, prefix="flt"):
