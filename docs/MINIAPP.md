@@ -1,0 +1,267 @@
+# PatternHub Mini App — локальный PoC
+
+## Исправление пустых фильтров — 25 октября 2026
+
+Дополнительно исправлена навигация верхних вкладок: переход в «Мужские»,
+«Унисекс» и другие разделы сбрасывает предыдущие поисковые условия/quick filters
+(сортировка сохраняется). Раньше «Новинки → Мужские» открывало пустое пересечение,
+хотя в мужском разделе есть товары. Комбинирование через Drawer и quick filters
+внутри раздела сохраняется; активные условия видны отдельными удаляемыми чипами.
+
+Повторно проверены живые сайты и выполнена синхронизация всех пяти providers
+через общий CatalogService в `data/miniapp-poc.sqlite3`. В старой копии четыре
+источника были выключены; они явно включены для этой демонстрации через админский API.
+Автоматическое включение при каждом старте не возвращалось.
+
+Доступно 3522 товара: VikiSews 787, Grasser 1319, HelperSew 593,
+SewItNow 534, Studio Yusupova 289. Фильтры: women 3265, men 72, kids 166,
+unisex 16; new 37, sale 1292, free 3. Только у трёх доступных товаров нет audience.
+Это snapshot проверки, не постоянные ожидаемые числа.
+
+Исправлена реальная ошибка HelperSew: игнорировалась `main-ui-pagination-next`,
+а результат ошибочно считался полным. Теперь обходятся страницы с сохранением
+контекста категории/аудитории/quick flags; повторы, ошибки и внешние ссылки не
+допускают complete snapshot. Повторный импорт нашёл 166 дополнительных товаров.
+Новинки подтверждены метками Grasser/HelperSew; бесплатные товары — нулевой ценой
+SewItNow; скидка Grasser проверена также на странице №904 (440 → 308 RUB).
+Для VikiSews/SewItNow/Studio Yusupova отсутствие new-сигнала по-прежнему не
+заменяется выдуманной датой. Свежий импорт VikiSews исправил отсутствовавшие audience.
+
+API `/api/meta` отдаёт coverage публично доступного каталога. Кнопки показывают
+общие counts; нулевые разделы не выглядят рабочими пустыми ссылками, а отключаются
+с объяснением. Витрина сообщает о товарах без аудитории и неполном покрытии новинок.
+Счётчик результатов по-прежнему учитывает комбинацию выбранных фильтров.
+Добавлены регрессии пагинации и coverage, а также браузерный тест кликов по всем
+четырём аудиториям и трём quick filters на реальной обновлённой базе.
+
+Числа 773 и ограничения старой базы ниже описывают **исходное состояние аудита**,
+а не обновлённую локальную демонстрацию.
+
+## Быстрый запуск
+
+Python 3.10–3.14, Node 22.17+ (проверено на Windows, Python 3.14, Node 22.17).
+Из корня репозитория, в виртуальном окружении:
+
+```powershell
+python -m pip install -r requirements-web.txt
+python -m uvicorn app.web.main:create_app --factory --host 127.0.0.1 --port 8000 --no-proxy-headers
+```
+
+Во втором терминале:
+
+```powershell
+cd frontend
+npm.cmd ci
+npm.cmd run dev
+```
+
+Открыть http://127.0.0.1:5173 — каталог; http://127.0.0.1:5173/#/admin — управление.
+Vite проксирует `/api` на localhost:8000; CORS не нужен. На Linux используйте `npm`.
+API: http://127.0.0.1:8000/docs. Данные берутся из `DATABASE_PATH` в окружении/`.env`,
+по умолчанию `data/patternhub.sqlite3`; BOT_TOKEN для публичного каталога не нужен.
+
+Можно обойтись одним сервером после `cd frontend; npm.cmd run build`:
+запустить/перезапустить backend после сборки, открыть http://127.0.0.1:8000.
+Маршрутизация карточек и админки — hash, перезагрузка прямой ссылки работает.
+
+### Безопасная копия для экспериментов
+
+Не тестируйте административные изменения на production-базе.
+Существующая база не удаляется, миграция аддитивная. Для консистентной копии
+даже при работающем боте используйте SQLite backup:
+
+```powershell
+python -c "import sqlite3; s=sqlite3.connect('file:data/patternhub.sqlite3?mode=ro',uri=True); d=sqlite3.connect('data/miniapp-local.sqlite3'); s.backup(d); d.close(); s.close()"
+$env:DATABASE_PATH='data/miniapp-local.sqlite3'
+```
+
+Команда backup перезапишет указанную **копию**, не исходник. При проверке PoC создана
+`data/miniapp-poc.sqlite3`: реальные 773 записи VikiSews из имеющейся базы, не seed.
+Файл исключён из Git. Исходная база и удалённый сервер не менялись.
+Если базы нет/она пуста, импортировать реальные данные существующим CLI
+`python -m app parse vikisews` (либо любой из пяти providers) с тем же DATABASE_PATH.
+Пустая база показывает честное пустое состояние, вымышленные товары не добавляются.
+
+### Локальный вход администратора
+
+Перед запуском backend:
+
+```powershell
+$env:APP_ENV='local'
+$env:MINIAPP_DEV_KEY=python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Скопируйте значение из своей переменной в форму входа /#/admin.
+python -m uvicorn app.web.main:create_app --factory --host 127.0.0.1 --port 8000 --no-proxy-headers
+```
+
+Ключ минимум 32 символа; в frontend bundle, URL, localStorage и Git не сохраняется.
+В браузере хранится только в памяти до перезагрузки. Не публикуйте локальный режим
+через туннель/reverse proxy! Сервер требует одновременно APP_ENV=local,
+правильный ключ в заголовке, loopback client IP и loopback hostname.
+Forwarded-заголовки отключены командой запуска. Приложение не разрешает CORS.
+Для production APP_ENV=production (по умолчанию), MINIAPP_DEV_KEY удалить:
+запуск с dev-ключом в production завершается ошибкой.
+
+### Telegram
+
+Задать BOT_TOKEN и `ADMIN_USER_IDS=123456789,987654321` (числовые Telegram user_id).
+В BotFather настроить Mini App/menu button на HTTPS URL размещённой сборки.
+Для публичного HTTPS использовать **production**, не локальный dev-вход.
+Существующий polling-бот можно продолжать запускать отдельно `python -m app`.
+Автоматически менять настройки реального бота этот PoC не пытается.
+
+Браузер отправляет исходный Telegram.WebApp.initData в X-Telegram-Init-Data.
+Backend проверяет HMAC SHA-256 по официальному алгоритму Telegram, сравнивает
+подпись constant-time, отклоняет дубли параметров, истёкший auth_date (>1 часа),
+дату более чем на 30 секунд в будущем и ID вне allowlist. initDataUnsafe не используется.
+После истечения часа нужно переоткрыть Mini App. Cookies/sessions не создаются.
+Не логируйте заголовки авторизации и не раздавайте BOT_TOKEN фронтенду.
+
+## Что реализовано
+
+- CSS Grid: две карточки на телефоне, 3–5 на широком экране; фотографии,
+  цена/старая цена, достоверные импортированные признаки, карточка и ссылка продавца.
+- Поиск без учёта регистра (включая кириллицу), комбинируемые source/category/audience,
+  new/sale/free/beginner/knit, сортировка по названию/цене. По 24 записи, максимум 60.
+- Категории/бренды с количествами в `/api/meta` и фасеты текущей выборки в `/api/products`.
+  Горизонтальные категории показывают общие counts; итоговый счётчик — все фильтры вместе.
+- Drawer фильтров с закреплённым footer, PrimeVue Select с поиском в длинных списках,
+  клавиатурой, checkmark и очисткой; единый светлый/тёмный preset.
+- Skeleton, ошибка с повтором, пустая выдача, fallback изображения; Telegram BackButton,
+  тема и themeChanged, фильтры/подгруженные карточки/scroll сохраняются при возврате.
+- Админка: источники включить/выключить, добавить метаданные сайта со статусом
+  «Ожидает подключения парсера»; наличие адаптера означает регистрацию provider,
+  **не** гарантию последнего успешного импорта/доступности сайта.
+- Админка: включение/порядок фильтров (в Drawer), порядок/видимость разделов аудитории
+  главного меню. Настройки реально сохраняются в SQLite и учитываются API/витриной.
+  Отключённые фильтры игнорируются публичным API. Изменения других администраторов
+  видны после перезагрузки; live-push нет. Настройки касаются Mini App, не клавиатуры бота.
+- Товары: поиск по всем, просмотр, hide/show, override внутренней категории,
+  сброс категории к данным парсера. Hide/show не восстанавливает отсутствующий на сайте
+  товар и не включает отключённый источник.
+- Публичный list/detail: только available + enabled source + не hidden.
+  Только защищённый `/api/admin/products` явно включает скрытые/недоступные записи.
+
+Цена есть не у всех; отсутствующая отображается как «Цена в магазине», нулевая —
+«Бесплатно». Сортировка цены — числовая с NULL в конце, без конвертации валют;
+для каталога с разными валютами нужно ограничить валюту до сравнения цен.
+Диапазоны цены/размеров не выставлены как работающие фильтры при неполных данных.
+
+## Повторное использование и аудит
+
+Общие ParsedProduct/Product, нормализация CATEGORIES/AUDIENCES, таблицы products/sources/settings
+и upsert по source+source_product_id (fallback source+URL) остаются единственным импортным путём.
+WebCatalogRepository наследует ProductRepository: не дублирует импорт, использует
+его преобразование строк в Product; добавляет только JOIN для web-видимости/overrides,
+пагинацию, поиск и настройки. WebCatalogService наследует CatalogService, добавляет
+неблокирующий browse; synchronize остаётся существующим, для всех пяти providers.
+Оригинальные providers и aiogram handlers не переписаны. Нет VikiSews-specific схем.
+
+Найдены проблемы:
+
+1. initialize раньше принудительно включал Grasser/HelperSew/Studio Yusupova/SewItNow.
+   Исправлено: INSERT OR IGNORE задаёт defaults только при создании, выбор сохраняется.
+2. Исходный ProductRepository._where проверял available, но не sources.enabled.
+   Web API применяет дополнительное ограничение; старый интерфейс бота не переделан,
+   его выдача пока не учитывает web-hide/overrides и enabled. Это ограничение PoC.
+3. В исходном каталоге отсутствовал поиск и параметризованная сортировка.
+   Web-запросы параметризованы, сортировка строго из allowlist, поиск через instr/casefold
+   (%, _ и SQL-фрагменты не превращаются в wildcard/SQL).
+4. Фото — внешний URL, а Telegram file_id браузеру не подходит. Фронтенд запрашивает
+   URL напрямую с no-referrer, без опасного server-side proxy; внешние ошибки отображаются
+   fallback. Нет скачивания произвольного пользовательского URL сервером. Ссылки ограничены
+   HTTP(S) без credentials, описания рендерятся текстом, не v-html.
+5. Локальная старая база: 773 товара VikiSews, 17 без цены, все 773 без audience,
+   sizes и description, is_new=0 у всех. Поэтому женские/мужские/детские и новинки
+   на этой копии могут быть пустыми. Нельзя выдавать отсутствие данных за отсутствие
+   таких моделей. Обновлённый импорт/обогащение нужны отдельно, исходник не переписан.
+
+### Новинки — без выдуманных дат
+
+Grasser определяет новинку по label «новинка», HelperSew — по label new.
+SewItNow и Studio Yusupova явно оставляют False, VikiSews listing в текущем коде
+не определяет new (default False; enrichment лишь переносит значение).
+False здесь означает «не подтверждено», а не доказанную старую модель.
+PoC показывает только импортированный True (`new_basis=source_label`) и не вычисляет
+новизну из updated_at/created_at. updated_at меняется даже при обновлении фото/file_id;
+created_at означает импорт, а не публикацию. «Дата обновления источника» тоже не
+обязательно дата релиза. Массовый первый импорт не должен превращаться в «новинки».
+
+Для надёжного расширения: хранить источник доказательства (badge / published_at),
+timestamp проверки и срок актуальности. Если сайт не даёт данных, отдельно фиксировать
+успешный полный baseline по источнику; только впервые обнаруженные **после baseline**
+ID считать «Впервые в нашем каталоге» в течение, например, 14 дней. Это отдельный
+признак, не «новинка у производителя». Такой baseline/TTL pipeline не реализован
+в PoC; для SewItNow new пока честно неизвестен. Старые source badges могут устареть
+без регулярной успешной синхронизации — перед production нужен freshness policy.
+
+### Хранение изменений
+
+product_overrides(product_id PK/FK ON DELETE CASCADE, hidden, category, updated_at)
+отделена от импортируемых полей; повторный upsert её не трогает. Полное удаление
+товара CLI может удалить override по FK — обычная sync скрывает missing availability.
+UI settings хранятся в существующей settings, ключ miniapp.ui, порядок — порядок массива.
+В БД не попадают Telegram initData, dev-ключи и BOT_TOKEN.
+
+## Исследование
+
+- [Официальная документация Telegram](https://core.telegram.org/bots/webapps): initData,
+  HMAC, themeChanged, ready/expand и BackButton. Нет доверия initDataUnsafe.
+- [tma-shop](https://github.com/IvanTereshin/tma-shop): изучен README/структура,
+  пример разделения storefront/API и серверной авторизации; исходники не копировались,
+  чужие payments/cart/Postgres не переносились.
+- [PrimeVue DataView](https://primevue.org/dataview/), [Select](https://primevue.org/select/),
+  [Drawer](https://primevue.org/drawer/): выбраны готовые Select/Drawer/ToggleSwitch/
+  Button/InputText/Skeleton. DataView не нужен поверх простого CSS Grid и server pagination.
+  Сейчас ссылки перенаправляют на новые docs; зависимости PoC намеренно PrimeVue 4.
+- [TeleShop](https://t.me/TeleShop_Clothes_Bot) недоступен веб-инструменту; интерфейс
+  внутри Telegram не просмотрен. Реальная Telegram-сессия не тестировалась.
+
+## Проверки
+
+```powershell
+python -m unittest discover -s tests -v
+cd frontend
+npm.cmd ci
+npm.cmd run build
+npx.cmd playwright install chromium
+# Backend на 127.0.0.1:8000 с отдельной копией БД и собранным dist.
+# Для admin e2e передать тот же MINIAPP_DEV_KEY в окружение тестового процесса.
+npm.cmd run test:e2e
+```
+
+Базовый результат до изменений: 112 тестов OK (9.208 s).
+После реализации: 122 теста OK (10.035 s); production frontend build и TypeScript
+проверка проходят. `npm audit` после установки: 0 vulnerabilities.
+Финальный Chromium прогон: 3 сценария OK (15.4 s): каталог/селекты/навигация/темы,
+авторизация и админка, network retry и image fallback. Просмотрены реальные скриншоты
+на 390×844 и 1440×1000; раскрытые списки проверены после завершения анимации.
+Добавлены 10 API/security-тестов: комбинации, кириллица/SQL payload, пагинация,
+disabled источники после restart, override после upsert, unsafe URL, HMAC/expiry,
+403 allowlist, защита всех write routes, settings persistence, dev loopback guard.
+Браузерные тесты идут по реальному API на копии каталога; admin e2e меняет её настройки,
+не запускать на production. Скриншоты — frontend/test-results (исключены из Git).
+Node/Python dependencies ставятся отдельно: aiogram не обязан загружать FastAPI.
+
+## Перед production
+
+HTTPS и домен, BotFather URL, production env и allowlist; резервное копирование;
+проверка на реальных Telegram iOS/Android/Desktop; полная свежая синхронизация пяти
+источников и мониторинг её статуса; политика устаревания новинок/цен;
+rate limits, аудит админских действий, CSP и self-hosted шрифты, hardening reverse proxy;
+стратегия thumbnail cache при hotlink/404. Проверить совместимость действующего бота
+с web-видимостью, если админские правила должны быть общими для обоих интерфейсов.
+Сейчас нет фонового scheduler, image proxy, платежей, корзины, CRM и новых парсеров.
+
+## Карта изменений
+
+- `app/database.py`: аддитивная таблица overrides, сохранение enabled, SQLite casefold.
+- `app/web/auth.py`: конфигурация и защита административного API.
+- `app/web/catalog.py`: расширения общих repository/service для web-выдачи.
+- `app/web/main.py`: FastAPI factory, read-only каталог, защищённая админка, static dist.
+- `frontend/src`: Vue витрина/админка, обёртка над настоящим PrimeVue Select,
+  общий theme preset, адаптивные стили и Telegram API integration.
+- `frontend/e2e`, `tests/test_web.py`: браузерные/API/security проверки.
+- `requirements-web.txt`, `frontend/package*.json`: отдельные зависимости и npm lock.
+- `.env.example`, `.gitignore`, `README.md`, этот документ: запуск и безопасные defaults.
+
+Изменения локальные в feature-ветке, не отправлялись в Git и не выкладывались на сервер.

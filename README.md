@@ -1,5 +1,12 @@
 # PatternHub Bot
 
+## Telegram Mini App PoC
+
+В ветке `feature/miniapp-catalog-admin-20261025` добавлены Vue 3 + PrimeVue 4
+витрина и FastAPI поверх существующей SQLite. Запуск, админка, аудит и
+ограничения описаны в [docs/MINIAPP.md](docs/MINIAPP.md).
+Существующий CLI и aiogram-бот запускаются как раньше.
+
 Локальный MVP Telegram-бота-агрегатора выкроек. Бот работает через long polling,
 показывает каталог на команду `/start` и один раз сохраняет `chat_id` первого
 тестового пользователя в SQLite. Повторные запуски и команды `/start` от других

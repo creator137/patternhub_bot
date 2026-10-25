@@ -1,0 +1,210 @@
+/* PrimeVue retains focus management, keyboard navigation and ARIA semantics. */
+.catalog-select {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  align-items: center;
+  box-shadow: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.catalog-select .p-select-label {
+  font:
+    500 14px/20px Manrope,
+    Arial,
+    sans-serif;
+  padding: 13px 14px;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.catalog-select .p-select-dropdown {
+  width: 44px;
+  min-width: 44px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.select-chevron {
+  font-size: 12px !important;
+  line-height: 1;
+  transition: transform 0.18s;
+  color: inherit;
+}
+.catalog-select.p-select-open .select-chevron {
+  transform: rotate(180deg);
+}
+.catalog-select .p-select-clear-icon {
+  width: 14px;
+  height: 14px;
+  inset-inline-end: 46px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.catalog-select:has(.p-select-clear-icon) .p-select-label {
+  padding-inline-end: 30px;
+}
+.catalog-select.p-focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.p-select-overlay {
+  font-family: Manrope, Arial, sans-serif;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 12px 32px #17211320;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+}
+.p-select-list {
+  padding: 6px;
+  margin: 0;
+  list-style: none;
+}
+.p-select-option {
+  min-height: 44px;
+  gap: 10px;
+  padding: 11px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  border-radius: 8px;
+  align-items: center;
+}
+.p-select-option-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.p-select-option-check-icon,
+.p-select-option-blank-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.p-select-header {
+  padding: 10px 10px 4px;
+}
+.p-select-filter {
+  width: 100%;
+  height: 42px;
+  font-size: 13px;
+}
+.p-select-empty-message {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.toolbar > .catalog-select {
+  width: 205px;
+  flex-shrink: 0;
+}
+.filter-fields > label {
+  font-size: 12px;
+  font-weight: 600;
+  gap: 9px;
+}
+.filter-fields .toggle-row {
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+.p-toggleswitch {
+  flex-shrink: 0;
+}
+.filter-drawer.p-drawer-bottom {
+  height: min(85dvh, 740px) !important;
+  max-height: 85dvh !important;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+.filter-drawer .p-drawer-header {
+  padding: 24px 24px 20px;
+  flex-shrink: 0;
+}
+.filter-drawer .p-drawer-title {
+  font:
+    700 20px/1.4 Manrope,
+    Arial,
+    sans-serif;
+  letter-spacing: -0.5px;
+}
+.filter-drawer .p-drawer-content {
+  padding: 0 24px 24px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.filter-drawer .p-drawer-footer {
+  padding: 16px 24px max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  flex-shrink: 0;
+}
+.filter-drawer .p-drawer-close-button {
+  width: 36px;
+  height: 36px;
+  background: var(--soft);
+  border-radius: 50%;
+  color: var(--muted);
+}
+.filter-drawer .p-drawer-close-button svg {
+  width: 14px;
+  height: 14px;
+}
+.filter-drawer .p-drawer-footer .p-button:last-child {
+  min-width: 180px;
+}
+.p-button {
+  font:
+    600 13px/20px Manrope,
+    Arial,
+    sans-serif;
+}
+.p-button-icon {
+  font-size: 14px;
+}
+.p-inputtext {
+  font-family: Manrope, Arial, sans-serif;
+  box-shadow: none !important;
+}
+.p-button-outlined {
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+  background: var(--paper) !important;
+}
+.p-button-outlined:hover {
+  border-color: var(--accent) !important;
+  background: var(--soft) !important;
+}
+@media (max-width: 600px) {
+  .filter-drawer .p-drawer-header {
+    padding: 22px 20px 18px;
+  }
+  .filter-drawer .p-drawer-content {
+    padding: 0 20px 20px;
+  }
+  .filter-drawer .p-drawer-footer {
+    padding: 14px 20px max(14px, env(safe-area-inset-bottom));
+  }
+  .filter-drawer .p-drawer-title {
+    font-size: 19px;
+  }
+  .filter-fields {
+    gap: 18px;
+  }
+  .catalog-select .p-select-label {
+    font-size: 14px;
+  }
+  .filter-drawer .p-drawer-footer .p-button:last-child {
+    flex: 1;
+  }
+  .p-select-overlay {
+    max-width: calc(100vw - 40px);
+  }
+}

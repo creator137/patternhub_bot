@@ -6,6 +6,9 @@ __pycache__/
 .mypy_cache/
 data/
 logs/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
 .run/
 *.sqlite3
 *.sqlite3-shm

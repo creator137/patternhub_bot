@@ -105,25 +105,19 @@ class Database:
                         "studio_yusupova",
                         "Studio Yusupova",
                         "https://studio-yusupova.ru",
-                        0,
+                        1,
                     ),
                     ("sewitnow", "SewItNow", "https://sewitnow.ru", 1),
                 ),
             )
-            connection.execute("UPDATE sources SET enabled = 1 WHERE name = 'grasser'")
-            connection.execute("UPDATE sources SET enabled = 1 WHERE name = 'helpersew'")
-            connection.execute(
-                "UPDATE sources SET enabled = 1 WHERE name = 'studio_yusupova'"
-            )
-            connection.execute(
-                """
-                UPDATE sources
-                SET display_name = 'SewItNow',
-                    base_url = 'https://sewitnow.ru',
-                    enabled = 1
-                WHERE name = 'sewitnow'
-                """
-            )
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS product_overrides (
+                    product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+                    hidden INTEGER NOT NULL DEFAULT 0,
+                    category TEXT,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
     @staticmethod
     def _ensure_column(
@@ -140,6 +134,7 @@ class Database:
     def connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.row_factory = sqlite3.Row
+        connection.create_function("casefold", 1, lambda value: (value or "").casefold())
         connection.execute("PRAGMA foreign_keys = ON")
         try:
             yield connection

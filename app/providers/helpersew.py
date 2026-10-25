@@ -140,7 +140,8 @@ class HelperSewProvider(BaseProvider):
         }
         timeout = httpx.Timeout(self.timeout, connect=min(20.0, self.timeout))
 
-        pages = self.category_pages[: self.max_categories]
+        pages = list(self.category_pages[: self.max_categories])
+        visited: set[str] = set()
         async with httpx.AsyncClient(
             headers=headers, timeout=timeout, follow_redirects=True, trust_env=False
         ) as client:
@@ -149,6 +150,11 @@ class HelperSewProvider(BaseProvider):
                     page_config
                 )
                 page_url = urljoin(self.base_url, path)
+                if page_url in visited or len(visited) >= 1000:
+                    errors += 1
+                    logger.error("HelperSew pagination repeated or exceeded safety limit: %s", page_url)
+                    continue
+                visited.add(page_url)
                 html = await self._get_page(client, page_url)
                 if html is None:
                     errors += 1
@@ -187,6 +193,14 @@ class HelperSewProvider(BaseProvider):
                     len(page_products),
                     new_count,
                 )
+                try:
+                    next_url = self.next_page_url(html, page_url)
+                except ValueError as error:
+                    errors += 1
+                    logger.warning("HelperSew pagination rejected: %s", error)
+                    continue
+                if next_url:
+                    pages.append((next_url, audience, category, is_beginner, is_knit))
 
         return ProviderResult(
             list(products_by_key.values()),
@@ -194,6 +208,18 @@ class HelperSewProvider(BaseProvider):
             skipped=skipped,
             complete=errors == 0 and self.max_categories is None,
         )
+
+    @staticmethod
+    def next_page_url(html: str, page_url: str) -> str | None:
+        soup = BeautifulSoup(html, "html.parser")
+        link = soup.select_one("a.main-ui-pagination-next[href]")
+        if link is None:
+            return None
+        target = urljoin(page_url, str(link["href"]))
+        current, following = urlsplit(page_url), urlsplit(target)
+        if (following.scheme, following.netloc, following.path) != (current.scheme, current.netloc, current.path):
+            raise ValueError("Unexpected external HelperSew pagination URL")
+        return target
 
     async def _get_page(self, client: httpx.AsyncClient, url: str) -> str | None:
         for attempt in range(1, self.retries + 1):
