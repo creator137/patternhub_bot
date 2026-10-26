@@ -59,6 +59,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     repo = WebCatalogRepository(database)
     app = FastAPI(title="PatternHub Mini App", version="0.1.0")
     app.state.web_settings = web_settings or WebSettings.from_env()
+    app.state.database = database
     app.state.catalog = WebCatalogService(repo)
 
     @app.middleware("http")

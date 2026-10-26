@@ -16,8 +16,11 @@ from app.web.auth import WebSettings, telegram_user
 from app.web.main import create_app
 
 
-def signed(user_id=42, age=0):
-    values = {"auth_date": str(int(time.time()) - age), "user": json.dumps({"id": user_id}), "query_id": "test"}
+def signed(user_id=42, age=0, username=None):
+    user = {"id": user_id}
+    if username is not None:
+        user["username"] = username
+    values = {"auth_date": str(int(time.time()) - age), "user": json.dumps(user), "query_id": "test"}
     key = hmac.new(b"WebAppData", b"test-token", hashlib.sha256).digest()
     values["hash"] = hmac.new(key, "\n".join(f"{k}={v}" for k, v in sorted(values.items())).encode(), hashlib.sha256).hexdigest()
     return urlencode(values)
@@ -95,6 +98,26 @@ class WebTests(unittest.TestCase):
     def test_all_admin_writes_require_auth(self):
         for method,path,payload in [("POST","/api/admin/sources",{"display_name":"X","base_url":"https://example.com"}), ("PATCH","/api/admin/sources/grasser",{"enabled":False}), ("PATCH","/api/admin/products/1",{"hidden":True}), ("PUT","/api/admin/settings",{"filters":[],"menu":[]})]:
             self.assertEqual(self.client.request(method,path,json=payload).status_code, 401)
+
+    def test_username_admins_bind_verified_stable_ids(self):
+        self.client.app.state.web_settings = WebSettings(
+            "test-token", admin_usernames=frozenset({"shanniwaby", "tatiana_svetlic"}))
+        for user_id, username in ((101, "Shanniwaby"), (202, "tatiana_svetlic")):
+            headers = {"X-Telegram-Init-Data": signed(user_id, username=username)}
+            self.assertEqual(self.client.get("/api/admin/session", headers=headers).status_code, 200)
+            # The owner keeps access even after changing their username.
+            headers = {"X-Telegram-Init-Data": signed(user_id, username="renamed")}
+            self.assertEqual(self.client.get("/api/admin/session", headers=headers).status_code, 200)
+            headers = {"X-Telegram-Init-Data": signed(303, username=username)}
+            self.assertEqual(self.client.get("/api/admin/session", headers=headers).status_code, 403)
+        self.assertEqual(self.client.get("/api/admin/session", headers=self.auth).status_code, 403)
+
+    def test_username_claim_requires_telegram_signature(self):
+        self.client.app.state.web_settings = WebSettings("test-token", admin_usernames=frozenset({"shanniwaby"}))
+        raw = signed(101, username="outsider").replace("outsider", "shanniwaby")
+        self.assertEqual(self.client.get("/api/admin/session", headers={"X-Telegram-Init-Data": raw}).status_code, 401)
+        with self.db.connect() as db:
+            self.assertIsNone(db.execute("SELECT value FROM settings WHERE key='miniapp.admin.shanniwaby'").fetchone())
 
     def test_settings_persist_and_affect_query(self):
         ui = self.client.get("/api/meta").json()["ui"]

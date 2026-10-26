@@ -423,7 +423,7 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Открыть на сайте", str(keyboard))
 
     async def test_main_menu_replaces_unisex_with_all_brands(self) -> None:
-        message = SimpleNamespace(answer=AsyncMock())
+        message = SimpleNamespace(answer=AsyncMock(), chat=SimpleNamespace(type="private"))
 
         await show_main_menu(message, self.service)
 

@@ -1,5 +1,46 @@
 # PatternHub Mini App — локальный PoC
 
+## Production: подключение к боту
+
+Backend и бот должны использовать один `BOT_TOKEN` и один `DATABASE_PATH`.
+Соберите `frontend` через `npm ci && npm run build`, установите Python-зависимости
+из `requirements-web.txt`. В production `.env` дополнительно задайте:
+
+```dotenv
+APP_ENV=production
+MINIAPP_URL=https://YOUR_CATALOG_DOMAIN/
+ADMIN_USERNAMES=shanniwaby,tatiana_svetlic
+MINIAPP_DEV_KEY=
+```
+
+Имена здесь разрешают первоначальную привязку только после проверки подписи
+Telegram. При первом входе ID сохраняется в `settings` под ключом
+`miniapp.admin.<username>`; новый владелец того же username не получит доступ.
+Числовой `ADMIN_USER_IDS` также поддерживается. Для отзыва доступа удалите
+соответствующий username/ID из окружения и перезапустите backend. Не удаляйте
+привязки из БД без необходимости: они предотвращают передачу прав с username.
+
+До миграции сделайте SQLite backup действующей БД. Запустите backend отдельным
+systemd service с рабочим каталогом проекта, той же БД и командой:
+
+```bash
+.venv/bin/python -m uvicorn app.web.main:create_app --factory --host 127.0.0.1 --port 8017 --no-proxy-headers
+```
+
+Настройте reverse proxy с действительным HTTPS-сертификатом на этот локальный
+порт. Проверьте `/api/meta`, `/api/products`, отказ неавторизованному запросу
+`/api/admin/session` (401) и загрузку `/`. Только после проверки HTTPS перезапустите
+бота с `MINIAPP_URL`: он установит общую кнопку меню Telegram «Каталог» и покажет
+Web App кнопку в личном чате при `/start`. Групповые reply-клавиатуры её не содержат.
+`MINIAPP_DEV_KEY` в production должен быть пустым; токен не передаётся фронтенду.
+
+Браузерный тест подписанного входа двух администраторов запускайте **только на
+изолированной копии БД**, backend с тестовым токеном и соответствующим
+`ADMIN_USERNAMES`. Передайте тот же тестовый токен через `E2E_BOT_TOKEN` тестовому
+процессу и локальный URL через `PLAYWRIGHT_BASE_URL`, затем запустите
+`playwright test telegram-admin.spec.ts`. Не используйте настоящий токен для
+этого теста: тест имитирует Telegram и привязывает тестовые числовые ID.
+
 ## Исправление пустых фильтров — 25 октября 2026
 
 Дополнительно исправлена навигация верхних вкладок: переход в «Мужские»,

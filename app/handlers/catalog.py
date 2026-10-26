@@ -19,8 +19,10 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 
+from app.config import load_settings
 from app.models.product import CatalogCategory, Product, ProductFilter
 from app.services.catalog import (
     BRANDS_SECTION,
@@ -84,13 +86,17 @@ class ProductCallback(CallbackData, prefix="prd"):
     quick_filter: str = FILTER_ALL
 
 
-def create_main_keyboard(sections: list[str] | None = None) -> ReplyKeyboardMarkup:
+def create_main_keyboard(
+    sections: list[str] | None = None, *, miniapp_url: str | None = None
+) -> ReplyKeyboardMarkup:
     section_titles = sections or list(SECTION_BY_TEXT)
     rows = [
         [KeyboardButton(text=title) for title in section_titles[index : index + 2]]
         for index in range(0, len(section_titles), 2)
     ]
     rows.append([KeyboardButton(text=HOME_TEXT)])
+    if miniapp_url:
+        rows.insert(0, [KeyboardButton(text="Открыть каталог", web_app=WebAppInfo(url=miniapp_url))])
     return ReplyKeyboardMarkup(
         keyboard=[row for row in rows if row],
         resize_keyboard=True,
@@ -106,10 +112,14 @@ async def show_main_menu(message: Message, catalog_service: CatalogService) -> N
         if section.code in AUDIENCE_SECTIONS and section.available
     ]
     visible_titles.extend(["🏷 Все бренды", "🔥 Скидки", "🆓 Бесплатные", "🆕 Новинки"])
+    miniapp_url = (
+        load_settings(require_token=False).miniapp_url
+        if message.chat.type == "private" else None
+    )
     await send_message_with_retry(
         message,
         "Каталог выкроек\n\nВыберите раздел:",
-        reply_markup=create_main_keyboard(visible_titles),
+        reply_markup=create_main_keyboard(visible_titles, miniapp_url=miniapp_url),
     )
 
 

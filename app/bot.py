@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 from app.config import Settings
 from app.database import Database
@@ -30,6 +31,14 @@ async def run_bot(settings: Settings) -> None:
     dispatcher.include_router(create_start_router(test_chat_service, catalog_service))
     dispatcher.include_router(create_catalog_router(catalog_service))
     bot = Bot(token=settings.bot_token)
-
-    logger.info("Starting Telegram bot in long polling mode")
-    await dispatcher.start_polling(bot)
+    try:
+        if settings.miniapp_url:
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="Каталог", web_app=WebAppInfo(url=settings.miniapp_url),
+                )
+            )
+        logger.info("Starting Telegram bot in long polling mode")
+        await dispatcher.start_polling(bot)
+    finally:
+        await bot.session.close()

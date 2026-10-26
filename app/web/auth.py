@@ -15,6 +15,7 @@ class WebSettings:
     admin_ids: frozenset[int] = frozenset()
     environment: str = "production"
     dev_key: str = ""
+    admin_usernames: frozenset[str] = frozenset()
 
     def __post_init__(self):
         if self.environment not in {"local", "production"}:
@@ -26,7 +27,8 @@ class WebSettings:
     def from_env(cls):
         return cls(os.getenv("BOT_TOKEN", ""),
                    frozenset(int(x.strip()) for x in os.getenv("ADMIN_USER_IDS", "").split(",") if x.strip()),
-                   os.getenv("APP_ENV", "production"), os.getenv("MINIAPP_DEV_KEY", ""))
+                   os.getenv("APP_ENV", "production"), os.getenv("MINIAPP_DEV_KEY", ""),
+                   frozenset(x.strip().lstrip("@").casefold() for x in os.getenv("ADMIN_USERNAMES", "").split(",") if x.strip().lstrip("@")))
 
 
 def telegram_user(raw: str, token: str, now: float | None = None) -> int:
@@ -63,7 +65,20 @@ def require_admin(request: Request):
         and request.url.hostname in {"localhost", "127.0.0.1", "::1"}
         and hmac.compare_digest(dev_key, settings.dev_key)):
         return 0
-    user_id = telegram_user(request.headers.get("x-telegram-init-data", ""), settings.bot_token)
-    if user_id not in settings.admin_ids:
-        raise HTTPException(403, "Administrator access required")
-    return user_id
+    raw = request.headers.get("x-telegram-init-data", "")
+    user_id = telegram_user(raw, settings.bot_token)
+    if user_id in settings.admin_ids:
+        return user_id
+    # Only signed Telegram usernames may claim an unbound account. Pin the ID
+    # once so a later username transfer cannot transfer administrative access.
+    user = json.loads(dict(parse_qsl(raw))["user"])
+    username = str(user.get("username", "")).casefold()
+    with request.app.state.database.connect() as db:
+        for allowed in settings.admin_usernames:
+            key = "miniapp.admin." + allowed
+            if username == allowed:
+                db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (key, str(user_id)))
+            row = db.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+            if row and row[0] == str(user_id):
+                return user_id
+    raise HTTPException(403, "Administrator access required")

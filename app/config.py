@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -15,6 +16,7 @@ class Settings:
     bot_token: str | None
     database_path: Path
     log_level: str
+    miniapp_url: str | None = None
 
 
 def load_settings(*, require_token: bool = True) -> Settings:
@@ -31,4 +33,9 @@ def load_settings(*, require_token: bool = True) -> Settings:
     if not database_path.is_absolute():
         database_path = PROJECT_ROOT / database_path
     log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
-    return Settings(token, database_path, log_level)
+    miniapp_url = os.getenv("MINIAPP_URL", "").strip() or None
+    if miniapp_url:
+        url = urlsplit(miniapp_url)
+        if url.scheme != "https" or not url.hostname or url.username or url.password:
+            raise ValueError("MINIAPP_URL must be an HTTPS URL without credentials")
+    return Settings(token, database_path, log_level, miniapp_url)
