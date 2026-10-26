@@ -21,7 +21,7 @@ async def handle_start(
 ) -> None:
     if await test_chat_service.select_if_missing(message.chat.id):
         logger.info("Selected the first test chat_id: %s", message.chat.id)
-    await show_main_menu(message, catalog_service)
+    await show_main_menu(message, catalog_service, welcome=True)
 
 
 def create_start_router(

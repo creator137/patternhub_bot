@@ -20,9 +20,11 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
     WebAppInfo,
+    FSInputFile,
 )
 
 from app.config import load_settings
+from app.branding import WELCOME_IMAGE, WELCOME_TEXT
 from app.models.product import CatalogCategory, Product, ProductFilter
 from app.services.catalog import (
     BRANDS_SECTION,
@@ -104,7 +106,9 @@ def create_main_keyboard(
     )
 
 
-async def show_main_menu(message: Message, catalog_service: CatalogService) -> None:
+async def show_main_menu(
+    message: Message, catalog_service: CatalogService, *, welcome: bool = False
+) -> None:
     sections = await catalog_service.get_sections()
     visible_titles = [
         section.title
@@ -116,10 +120,19 @@ async def show_main_menu(message: Message, catalog_service: CatalogService) -> N
         load_settings(require_token=False).miniapp_url
         if message.chat.type == "private" else None
     )
+    keyboard = create_main_keyboard(visible_titles, miniapp_url=miniapp_url)
+    if welcome and WELCOME_IMAGE.is_file():
+        try:
+            await message.answer_photo(
+                FSInputFile(WELCOME_IMAGE), caption=WELCOME_TEXT, reply_markup=keyboard,
+            )
+            return
+        except TelegramAPIError as exc:
+            logger.warning("Welcome image could not be sent: %s", type(exc).__name__)
     await send_message_with_retry(
         message,
-        "Каталог выкроек\n\nВыберите раздел:",
-        reply_markup=create_main_keyboard(visible_titles, miniapp_url=miniapp_url),
+        WELCOME_TEXT if welcome else "allsewpattern\nКаталог выкроек\n\nВыберите раздел:",
+        reply_markup=keyboard,
     )
 
 

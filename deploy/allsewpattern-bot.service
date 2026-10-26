@@ -1,0 +1,24 @@
+[Unit]
+Description=allsewpattern Telegram bot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=allsewpattern
+Group=allsewpattern
+WorkingDirectory=/opt/allsewpattern
+EnvironmentFile=/opt/allsewpattern/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/allsewpattern/.venv/bin/python -m app
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/allsewpattern/data
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

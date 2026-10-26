@@ -57,7 +57,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     database = database or Database(config.database_path)
     database.initialize()
     repo = WebCatalogRepository(database)
-    app = FastAPI(title="PatternHub Mini App", version="0.1.0")
+    app = FastAPI(title="allsewpattern Mini App", version="0.1.0")
     app.state.web_settings = web_settings or WebSettings.from_env()
     app.state.database = database
     app.state.catalog = WebCatalogService(repo)

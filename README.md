@@ -1,4 +1,7 @@
-# PatternHub Bot
+# allsewpattern
+
+Сервис по подбору выкроек: Telegram-бот и Mini App с общим каталогом пяти брендов.
+Инструкции для действующего VPS: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Telegram Mini App PoC
 

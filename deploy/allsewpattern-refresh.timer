@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh allsewpattern catalog daily
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=allsewpattern-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -223,8 +223,8 @@ onUnmounted(() => {
 <template>
   <header class="header">
     <a href="#" class="logo"
-      ><span class="logo-mark">p<span>h</span></span
-      >PatternHub<span class="logo-dot">.</span></a
+      ><img class="logo-image" src="/brand/avatar.jpg" alt="" />
+      <span>allsewpattern</span></a
     >
     <div class="header-right">
       <span class="desktop muted">Ваше следующее любимое изделие</span
@@ -312,7 +312,7 @@ onUnmounted(() => {
             >Перейти в магазин <i class="pi pi-arrow-up-right"></i
           ></a>
           <p class="muted small">
-            Цена и наличие уточняются у продавца. PatternHub помогает найти
+            Цена и наличие уточняются у продавца. allsewpattern помогает найти
             выкройку.
           </p>
         </div>
@@ -511,9 +511,9 @@ onUnmounted(() => {
     >
   </main>
   <footer>
-    <a href="#" class="logo">PatternHub.</a>
+    <a href="#" class="logo">allsewpattern</a>
     <p>Место, где идеи обретают форму.</p>
-    <span>Локальный PoC · цены уточняйте у брендов</span>
+    <span>Сервис по подбору выкроек · цены уточняйте у брендов</span>
   </footer>
   <Drawer
     id="filters"

@@ -214,7 +214,7 @@ def main() -> None:
     from app.bot import run_bot
 
     configure_logging()
-    logging.getLogger(__name__).info("Starting PatternHub Bot application")
+    logging.getLogger(__name__).info("Starting allsewpattern application")
     asyncio.run(run_bot(settings))
 
 

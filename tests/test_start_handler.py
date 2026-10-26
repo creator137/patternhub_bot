@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 from app.handlers.start import handle_start
 from app.handlers.catalog import create_main_keyboard
 from app.services.catalog import CatalogSection
+from aiogram.exceptions import TelegramAPIError
 
 
 class StartHandlerTests(unittest.IsolatedAsyncioTestCase):
@@ -30,6 +31,7 @@ class StartHandlerTests(unittest.IsolatedAsyncioTestCase):
         message = SimpleNamespace(
             chat=SimpleNamespace(id=123456789, type="private"),
             answer=AsyncMock(),
+            answer_photo=AsyncMock(),
         )
         service = SimpleNamespace(select_if_missing=AsyncMock(return_value=True))
         catalog = SimpleNamespace(
@@ -45,8 +47,19 @@ class StartHandlerTests(unittest.IsolatedAsyncioTestCase):
         await handle_start(message, service, catalog)
 
         service.select_if_missing.assert_awaited_once_with(123456789)
+        message.answer_photo.assert_awaited_once()
+        self.assertIn("allsewpattern", message.answer_photo.await_args.kwargs["caption"])
+
+    async def test_welcome_photo_failure_keeps_catalog_accessible(self):
+        from app.handlers.catalog import show_main_menu
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="private"), answer=AsyncMock(),
+            answer_photo=AsyncMock(side_effect=TelegramAPIError(method=None, message="Unavailable")),
+        )
+        catalog = SimpleNamespace(get_sections=AsyncMock(return_value=[]))
+        await show_main_menu(message, catalog, welcome=True)
         message.answer.assert_awaited_once()
-        self.assertIn("Каталог выкроек", message.answer.await_args.args[0])
+        self.assertIn("allsewpattern", message.answer.await_args.args[0])
 
 
 if __name__ == "__main__":
