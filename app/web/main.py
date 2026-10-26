@@ -1,16 +1,23 @@
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+from contextlib import asynccontextmanager
+import asyncio
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import Response
+from fastapi import Request
+from hashlib import sha256
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, HttpUrl
 
 from app.config import load_settings
 from app.database import Database
 from app.models.categories import CATEGORIES
-from app.web.auth import WebSettings, require_admin
+from app.web.auth import WebSettings, require_admin, require_user
 from app.web.catalog import FILTERS, MENUS, WebCatalogRepository, WebCatalogService, safe_url
+from app.services.images import ImageCache, ImageUnavailable, image_key
+from app.repositories.media import MediaRepository
 
 
 class CatalogQuery(BaseModel):
@@ -26,10 +33,15 @@ class CatalogQuery(BaseModel):
     is_beginner: bool | None = None
     is_knit: bool | None = None
     sort: Literal["name", "price_asc", "price_desc"] = "name"
+    ids: str | None = Field(None, max_length=6000, pattern=r"^[0-9]{1,12}(,[0-9]{1,12}){0,499}$")
 
 
 class Toggle(BaseModel):
     enabled: bool
+
+
+class FavoriteInput(BaseModel):
+    saved: bool
 
 
 class SourceInput(BaseModel):
@@ -57,18 +69,33 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     database = database or Database(config.database_path)
     database.initialize()
     repo = WebCatalogRepository(database)
-    app = FastAPI(title="allsewpattern Mini App", version="0.1.0")
+    media_repo = MediaRepository(database)
+    images = ImageCache(database.path.parent / "media", repository=media_repo)
+    image_tasks: dict[tuple, asyncio.Task] = {}
+    @asynccontextmanager
+    async def lifespan(app):
+        yield
+        for task in list(image_tasks.values()):
+            task.cancel()
+        await asyncio.gather(*list(image_tasks.values()), return_exceptions=True)
+        await images.aclose()
+    app = FastAPI(title="allsewpattern Mini App", version="0.1.0", lifespan=lifespan)
     app.state.web_settings = web_settings or WebSettings.from_env()
     app.state.database = database
     app.state.catalog = WebCatalogService(repo)
+    app.state.images = images
 
     @app.middleware("http")
     async def security_headers(request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
-        if request.url.path.startswith("/api/"):
+        if request.url.path.startswith("/api/") and "Cache-Control" not in response.headers:
             response.headers["Cache-Control"] = "no-store"
+        elif request.url.path.startswith('/assets/'):
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        elif request.url.path in {'/', '/index.html'}:
+            response.headers['Cache-Control'] = 'no-cache'
         return response
 
     @app.get("/api/products")
@@ -82,6 +109,45 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
             raise HTTPException(404, "Product not found")
         return result[0]
 
+    @app.get("/api/products/{product_id}/image/{index}")
+    async def image(request: Request, product_id: int, index: int, size: Literal['thumb', 'detail'] = 'thumb'):
+        media = await asyncio.to_thread(repo.public_media, product_id)
+        urls = media['urls']
+        if index < 0 or index >= len(urls):
+            raise HTTPException(404, 'Image not found')
+        async def prepare_image():
+            path = await images.get(urls[index], size, referer=media['referer'])
+            if index == 0:
+                await asyncio.to_thread(media_repo.set_cover, product_id, image_key(urls[index]))
+            return path
+        key = (product_id, urls[index], size)
+        task = image_tasks.get(key)
+        if task is None:
+            task = asyncio.create_task(prepare_image())
+            image_tasks[key] = task
+            def finished(done):
+                image_tasks.pop(key, None)
+                if not done.cancelled():
+                    done.exception()
+            task.add_done_callback(finished)
+        try:
+            path = await asyncio.wait_for(asyncio.shield(task), timeout=2)
+        except (ImageUnavailable, TimeoutError, OSError):
+            old = await asyncio.to_thread(media_repo.last_cover, product_id) if index == 0 else None
+            choices = [images.cached_path(old['url'], kind) for kind in (size, 'thumb')] if old else []
+            path = next((candidate for candidate in choices if candidate.is_file()), None)
+            if path is None:
+                raise HTTPException(503, 'Image is being prepared', headers={'Retry-After': '2'}) from None
+        try:
+            content = await asyncio.to_thread(path.read_bytes)
+        except OSError:
+            raise HTTPException(503, 'Image is being prepared', headers={'Retry-After': '2'}) from None
+        etag = '"' + sha256(content).hexdigest() + '"'
+        headers = {'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800, stale-if-error=604800', 'ETag': etag}
+        if request.headers.get('if-none-match') == etag:
+            return Response(status_code=304, headers=headers)
+        return Response(content, media_type='image/webp', headers=headers)
+
     @app.get("/api/meta")
     def meta():
         facets = repo.page({"limit": 1})
@@ -93,9 +159,38 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     def session():
         return {"admin": True}
 
+    @app.get('/api/favorites')
+    def favorites(user_id: int = Depends(require_user)):
+        with database.connect() as db:
+            rows = db.execute("""SELECT f.product_id FROM favorites f JOIN products p ON p.id=f.product_id
+                JOIN sources s ON s.name=p.source LEFT JOIN product_overrides o ON o.product_id=p.id
+                WHERE f.user_id=? AND p.is_available=1 AND s.enabled=1 AND COALESCE(o.hidden,0)=0
+                ORDER BY f.created_at DESC, f.product_id DESC LIMIT 500""", (user_id,)).fetchall()
+        return {'ids': [row[0] for row in rows]}
+
+    @app.put('/api/favorites/{product_id}')
+    def favorite(product_id: int, value: FavoriteInput, user_id: int = Depends(require_user)):
+        if value.saved and not repo.page({'id': product_id, 'limit': 1})['total']:
+            raise HTTPException(404, 'Product not found')
+        with database.connect() as db:
+            if value.saved:
+                count = db.execute('SELECT COUNT(*) FROM favorites WHERE user_id=?', (user_id,)).fetchone()[0]
+                if count >= 500:
+                    exists = db.execute('SELECT 1 FROM favorites WHERE user_id=? AND product_id=?', (user_id, product_id)).fetchone()
+                    if not exists:
+                        raise HTTPException(409, 'Favorites limit reached')
+                db.execute('INSERT OR IGNORE INTO favorites(user_id,product_id) VALUES(?,?)', (user_id, product_id))
+            else:
+                db.execute('DELETE FROM favorites WHERE user_id=? AND product_id=?', (user_id, product_id))
+        return {'saved': value.saved}
+
     @app.get("/api/admin/sources", dependencies=[Depends(require_admin)])
     def sources():
         return repo.sources()
+
+    @app.get('/api/admin/media', dependencies=[Depends(require_admin)])
+    async def media_stats():
+        return await asyncio.to_thread(media_repo.dashboard)
 
     @app.post("/api/admin/sources", dependencies=[Depends(require_admin)], status_code=201)
     def add_source(value: SourceInput):

@@ -11,7 +11,7 @@
 }
 .catalog-select .p-select-label {
   font:
-    500 14px/20px Manrope,
+    500 14px/20px 'Manrope Variable',
     Arial,
     sans-serif;
   padding: 13px 14px;
@@ -52,7 +52,7 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 .p-select-overlay {
-  font-family: Manrope, Arial, sans-serif;
+  font-family: 'Manrope Variable', Arial, sans-serif;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--paper);
@@ -130,7 +130,7 @@
 }
 .filter-drawer .p-drawer-title {
   font:
-    700 20px/1.4 Manrope,
+    700 20px/1.4 'Manrope Variable',
     Arial,
     sans-serif;
   letter-spacing: -0.5px;
@@ -162,7 +162,7 @@
 }
 .p-button {
   font:
-    600 13px/20px Manrope,
+    600 13px/20px 'Manrope Variable',
     Arial,
     sans-serif;
 }
@@ -170,7 +170,7 @@
   font-size: 14px;
 }
 .p-inputtext {
-  font-family: Manrope, Arial, sans-serif;
+  font-family: 'Manrope Variable', Arial, sans-serif;
   box-shadow: none !important;
 }
 .p-button-outlined {

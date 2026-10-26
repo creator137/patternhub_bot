@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+import time
+import random
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Iterable
 
@@ -32,6 +34,9 @@ class ProductRepository:
                 product = raw_product.normalized()
                 existing_id = self._find_existing_id(connection, product)
                 values = self._values(product)
+                if product.image_urls:
+                    values["image_urls"] = json.dumps(product.image_urls, ensure_ascii=False)
+                    values['gallery_checked_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
                 if existing_id is None:
                     connection.execute(
                         f"INSERT INTO products ({', '.join(values)}) "
@@ -148,6 +153,64 @@ class ProductRepository:
                 """,
                 (status, product_id),
             )
+
+    def set_gallery(self, product_id: int, urls: Iterable[str], *, expected_url: str) -> None:
+        images = tuple(dict.fromkeys(urls))
+        if not images:
+            return
+        with self.database.connect() as db:
+            db.execute("""UPDATE products SET image_urls=?, image_url=?,
+                telegram_file_id=CASE WHEN image_url=? THEN telegram_file_id ELSE NULL END,
+                image_status=CASE WHEN image_url=? THEN image_status ELSE NULL END,
+                gallery_checked_at=CURRENT_TIMESTAMP
+                WHERE id=? AND product_url=?""",
+                (json.dumps(images, ensure_ascii=False), images[0], images[0], images[0], product_id, expected_url))
+            db.execute('DELETE FROM media_gallery_jobs WHERE product_id=?', (product_id,))
+
+    def gallery_failed(self, product_id: int, error: str):
+        with self.database.connect() as db:
+            row = db.execute('SELECT attempts FROM media_gallery_jobs WHERE product_id=?', (product_id,)).fetchone()
+            attempts = (row[0] if row else 0) + 1
+            deadline = time.time() + min(21600, 60 * 2 ** min(attempts, 9) * random.uniform(.8, 1.2))
+            db.execute('INSERT INTO media_gallery_jobs(product_id,attempts,next_attempt,last_error) VALUES(?,?,?,?) '
+                'ON CONFLICT(product_id) DO UPDATE SET attempts=excluded.attempts,next_attempt=excluded.next_attempt,last_error=excluded.last_error',
+                (product_id, attempts, deadline, error[:100]))
+
+    def media_products(self, *, product_id: int | None = None, source: str | None = None,
+                       galleries: bool = False, limit: int = 10000) -> list[Product]:
+        clauses = ["p.is_available=1", "s.enabled=1"]
+        values: list[object] = []
+        for key, value in (("id", product_id), ("source", source)):
+            if value is not None:
+                clauses.append(f"p.{key}=?")
+                values.append(value)
+        if galleries and product_id is None:
+            clauses.append("(p.gallery_checked_at IS NULL OR p.gallery_checked_at < datetime('now','-1 day'))")
+            clauses.append("NOT EXISTS (SELECT 1 FROM media_gallery_jobs j WHERE j.product_id=p.id AND j.next_attempt>?)")
+            values.append(time.time())
+        order = ('ROW_NUMBER() OVER (PARTITION BY p.source ORDER BY p.gallery_checked_at IS NOT NULL,p.name,p.id),p.source'
+                 if galleries else 'p.name,p.id')
+        with self.database.connect() as db:
+            rows = db.execute(f"""SELECT p.* FROM products p JOIN sources s ON s.name=p.source
+                WHERE {' AND '.join(clauses)} ORDER BY {order} LIMIT ?""",
+                (*values, limit)).fetchall()
+        return [self._to_product(row) for row in rows]
+
+    def cover_product_ids(self, image_url: str) -> list[int]:
+        with self.database.connect() as db:
+            return [row[0] for row in db.execute('SELECT id FROM products WHERE image_url=? AND is_available=1', (image_url,))]
+
+    def request_gallery_repair(self, image_url: str):
+        with self.database.connect() as db:
+            db.execute("""UPDATE products SET gallery_checked_at=NULL WHERE image_url=? OR EXISTS (
+                SELECT 1 FROM json_each(COALESCE(products.image_urls,'[]')) WHERE value=?)""", (image_url, image_url))
+
+    def products_with_image(self, image_url: str) -> list[Product]:
+        with self.database.connect() as db:
+            rows = db.execute("""SELECT p.* FROM products p JOIN sources s ON s.name=p.source
+                WHERE p.is_available=1 AND s.enabled=1 AND (p.image_url=? OR EXISTS (
+                SELECT 1 FROM json_each(COALESCE(p.image_urls,'[]')) WHERE value=?))""", (image_url, image_url)).fetchall()
+        return [self._to_product(row) for row in rows]
 
     def count_products(self, filters: ProductFilter | None = None) -> int:
         where, parameters = self._where(filters)
@@ -435,6 +498,7 @@ class ProductRepository:
             description=row["description"],
             product_url=row["product_url"],
             image_url=row["image_url"],
+            image_urls=tuple(json.loads(row["image_urls"])) if row["image_urls"] else None,
             telegram_file_id=row["telegram_file_id"],
             image_status=row["image_status"],
             is_available=bool(row["is_available"]),

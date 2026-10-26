@@ -4,6 +4,8 @@ import Aura from "@primeuix/themes/aura";
 import { definePreset } from "@primeuix/themes";
 import App from "./App.vue";
 import "primeicons/primeicons.css";
+import "@fontsource-variable/manrope";
+import "@fontsource/prata";
 import "./style.css";
 import "./controls.css";
 const PatternHub = definePreset(Aura, {

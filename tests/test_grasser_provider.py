@@ -17,6 +17,16 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class GrasserProviderTests(unittest.TestCase):
+    def test_badge_icon_is_not_selected_as_product_photo(self):
+        from bs4 import BeautifulSoup
+        card = BeautifulSoup('''<div class="catalog-block__image">
+            <img src="/local/templates/grasser/images/icon-discount.svg">
+            <a class="b-mini-slide"><picture><source srcset="/upload/real.webp"><img src="/upload/real.jpg"></picture></a>
+            </div>''', 'html.parser')
+        self.assertEqual(GrasserProvider._extract_image_url(card,'https://grasser.ru/'), 'https://grasser.ru/upload/real.webp')
+        icon = BeautifulSoup('<div class="catalog-block__image"><img src="/local/templates/grasser/images/icon-popular.svg"></div>', 'html.parser')
+        self.assertIsNone(GrasserProvider._extract_image_url(icon,'https://grasser.ru/'))
+
     def setUp(self) -> None:
         self.provider = GrasserProvider()
 

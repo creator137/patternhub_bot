@@ -388,6 +388,33 @@ class SewItNowProvider(BaseProvider):
         if marker not in self.incomplete_pages:
             self.incomplete_pages.append(marker)
 
+    def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
+        from urllib.parse import urlsplit
+        from app.providers.gallery import clean_images
+        soup = BeautifulSoup(html, 'html.parser')
+        script = soup.find('script', id='__NEXT_DATA__')
+        if not script:
+            return super().parse_gallery(html, product_url)
+        try:
+            data = json.loads(script.string or script.text)
+        except ValueError:
+            return ()
+        slug = urlsplit(product_url).path.rstrip('/').split('/')[-1]
+        values = []
+        def walk(node):
+            if isinstance(node, dict):
+                if node.get('slug') == slug:
+                    for image in node.get('images') or []:
+                        if isinstance(image, dict):
+                            values.append((image.get('storage_object') or {}).get('url'))
+                for child in node.values():
+                    walk(child)
+            elif isinstance(node, list):
+                for child in node:
+                    walk(child)
+        walk(data.get('props', {}).get('pageProps', {}))
+        return clean_images(values, product_url)
+
     def _parse_product(
         self,
         item: dict[str, Any],
@@ -424,6 +451,9 @@ class SewItNowProvider(BaseProvider):
             heights=heights,
             product_url=urljoin(self.base_url, f"/product/{slug}/"),
             image_url=self._image_url(item),
+            image_urls=tuple(str(image['storage_object']['url']) for image in item.get('images', [])
+                if isinstance(image, dict) and isinstance(image.get('storage_object'), dict)
+                and image['storage_object'].get('url')) or None,
             is_available=bool(item.get("status", True)),
         ).normalized()
 

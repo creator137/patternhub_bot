@@ -17,6 +17,7 @@ import {
 } from "./api";
 import ProductImage from "./ProductImage.vue";
 const props = defineProps<{ meta: Meta }>();
+const media = ref<{ total: number; cached: number; queue: Record<string, number>; gallery_errors: number } | null>(null);
 const emit = defineEmits<{ changed: [] }>();
 const tab = ref("sources"),
   sources = ref<Source[]>([]),
@@ -47,6 +48,7 @@ async function action(fn: () => Promise<void>) {
 }
 async function loadSources() {
   sources.value = await api<Source[]>("/admin/sources");
+  try { media.value = await api('/admin/media'); } catch { /* Source management remains available. */ }
 }
 async function loadProducts(more = false) {
   const p = await api<Page>(
@@ -86,6 +88,12 @@ onMounted(async () => {
     <p class="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</p>
     <h1>Управление</h1>
     <p class="muted">Настройки витрины и общий каталог всех источников.</p>
+    <div v-if="media" class="media-health">
+      <span><strong>{{ media.cached }} / {{ media.total }}</strong> Обложки в кэше</span>
+      <span><strong>{{ media.queue.pending || 0 }}</strong> Ожидают загрузки</span>
+      <span><strong>{{ media.queue.retry || 0 }}</strong> Повторные попытки</span>
+      <button class="icon-btn" aria-label="Обновить состояние фото" title="Обновить состояние фото" @click="loadSources"><i class="pi pi-refresh" /></button>
+    </div>
     <nav class="chips">
       <button
         v-for="item in [

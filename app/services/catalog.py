@@ -8,6 +8,7 @@ from time import monotonic
 from app.models.product import CatalogBrand, CatalogCategory, Product, ProductFilter, SyncStats
 from app.providers.base import BaseProvider
 from app.repositories.products import ProductRepository
+from app.repositories.media import MediaRepository
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ class CatalogService:
         added, updated = await asyncio.to_thread(
             self.repository.upsert_many, result.products
         )
+        await asyncio.to_thread(MediaRepository(self.repository.database).register_products, result.products)
         unavailable = 0
         if result.complete and result.errors == 0:
             unavailable = await asyncio.to_thread(

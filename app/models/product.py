@@ -79,6 +79,7 @@ class ParsedProduct:
     difficulty: str | None = None
     description: str | None = None
     image_url: str | None = None
+    image_urls: tuple[str, ...] | None = None
     is_available: bool = True
     source_updated_at: datetime | None = None
 
@@ -104,6 +105,7 @@ class ParsedProduct:
             (difficulty, description, name, subcategory)
         )
         is_knit = self.is_knit or _has_text_marker((subcategory,), ("трикотаж",))
+        images = tuple(dict.fromkeys(_clean_url(url) for url in self.image_urls or () if url))
         return replace(
             self,
             source=source,
@@ -126,7 +128,8 @@ class ParsedProduct:
             difficulty=difficulty,
             description=description,
             product_url=_clean_url(self.product_url),
-            image_url=_clean_url(self.image_url) if self.image_url else None,
+            image_url=_clean_url(self.image_url) if self.image_url else (images[0] if images else None),
+            image_urls=images if self.image_urls is not None else None,
         )
 
 
@@ -160,6 +163,7 @@ class Product:
     created_at: datetime
     updated_at: datetime
     source_updated_at: datetime | None
+    image_urls: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)

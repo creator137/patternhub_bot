@@ -19,6 +19,10 @@ class ProviderResult:
 class BaseProvider(ABC):
     source: str
 
+    def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
+        from app.providers.gallery import html_gallery
+        return html_gallery(html, product_url)
+
     @abstractmethod
     async def fetch_products(self) -> ProviderResult:
         """Fetch source data and return products in the shared catalog format."""

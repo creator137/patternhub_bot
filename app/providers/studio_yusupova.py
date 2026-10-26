@@ -176,6 +176,10 @@ class StudioYusupovaProvider(BaseProvider):
                 logger.warning("Could not parse Studio Yusupova product: %s", error)
         return products
 
+    def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
+        from app.providers.gallery import html_gallery
+        return html_gallery(html, product_url, '.woocommerce-product-gallery__image a')
+
     def _parse_product(
         self, item: dict[str, Any], category_index: dict[int, dict[str, Any]]
     ) -> ParsedProduct:
@@ -208,6 +212,8 @@ class StudioYusupovaProvider(BaseProvider):
             description=self._description(item),
             product_url=product_url,
             image_url=self._image_url(item),
+            image_urls=tuple(str(image['src']) for image in item.get('images', [])
+                if isinstance(image, dict) and image.get('src')) or None,
             is_available=bool(item.get("is_purchasable", True))
             and bool(item.get("is_in_stock", True))
             and not bool(item.get("is_password_protected", False)),

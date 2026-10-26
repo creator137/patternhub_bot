@@ -282,6 +282,11 @@ class HelperSewProvider(BaseProvider):
             products.append(product)
         return products
 
+    def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
+        from app.providers.gallery import html_gallery
+        return (html_gallery(html, product_url, '.cat-detail__l-subs > :not(.video) img')
+                or html_gallery(html, product_url, '.cat-detail__pics img'))
+
     def parse_product_page(
         self, html: str, product_url: str, seed: ParsedProduct | None = None
     ) -> ParsedProduct:

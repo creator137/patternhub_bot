@@ -297,6 +297,10 @@ class VikiSewsProvider(BaseProvider):
         soup = BeautifulSoup(html, "html.parser")
         return soup.select_one("#infinite-upload-more[data-link]") is not None
 
+    def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
+        from app.providers.gallery import html_gallery
+        return html_gallery(html, product_url, '.product-view .product-slide img')
+
     def parse_product_page(
         self, html: str, product_url: str, seed: ParsedProduct | None = None
     ) -> ParsedProduct:

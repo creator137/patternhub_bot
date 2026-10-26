@@ -56,6 +56,10 @@ def telegram_user(raw: str, token: str, now: float | None = None) -> int:
         raise HTTPException(401, "Invalid or expired Telegram authorization") from None
 
 
+def require_user(request: Request) -> int:
+    return telegram_user(request.headers.get('x-telegram-init-data', ''), request.app.state.web_settings.bot_token)
+
+
 def require_admin(request: Request):
     settings = request.app.state.web_settings
     # No cookies, no CORS, no forwarded-header trust. Dev key never enters the bundle.

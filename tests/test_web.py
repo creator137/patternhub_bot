@@ -14,6 +14,9 @@ from app.models.product import ParsedProduct
 from app.repositories.products import ProductRepository
 from app.web.auth import WebSettings, telegram_user
 from app.web.main import create_app
+from app.repositories.media import MediaRepository
+from app.services.images import image_key
+from unittest.mock import AsyncMock, patch
 
 
 def signed(user_id=42, age=0, username=None):
@@ -148,6 +151,70 @@ class WebTests(unittest.TestCase):
         for host,client_host,expected in [("localhost","127.0.0.1",200),("example.com","127.0.0.1",401),("localhost","203.0.113.1",401)]:
             with TestClient(app,base_url="http://"+host,client=(client_host,1234)) as client:
                 self.assertEqual(client.get("/api/admin/session",headers={"X-Dev-Key":"x"*32}).status_code,expected)
+
+    def test_favorites_are_private_idempotent_and_do_not_require_admin(self):
+        user = {'X-Telegram-Init-Data': signed(77)}
+        other = {'X-Telegram-Init-Data': signed(78)}
+        self.assertEqual(self.client.get('/api/favorites').status_code, 401)
+        for _ in range(2):
+            self.client.put('/api/favorites/1', headers=user, json={'saved':True}).raise_for_status()
+        self.assertEqual(self.client.get('/api/favorites', headers=user).json()['ids'], [1])
+        self.assertEqual(self.client.get('/api/favorites', headers=other).json()['ids'], [])
+        self.assertEqual(self.client.get('/api/admin/session', headers=user).status_code, 403)
+        self.client.put('/api/favorites/1', headers=other, json={'saved':False}).raise_for_status()
+        self.assertEqual(self.client.get('/api/favorites', headers=user).json()['ids'], [1])
+        self.client.put('/api/favorites/1', headers=user, json={'saved':False}).raise_for_status()
+        self.assertEqual(self.client.get('/api/favorites', headers=user).json()['ids'], [])
+
+    def test_favorites_and_id_filter_keep_public_visibility(self):
+        self.client.put('/api/favorites/1', headers=self.auth, json={'saved':True}).raise_for_status()
+        self.assertEqual(self.client.get('/api/products?ids=1').json()['total'], 1)
+        self.assertEqual(self.client.get('/api/products?ids=1,2').json()['total'], 2)
+        self.assertEqual(self.client.get('/api/products?ids=1%29%20OR%201=1').status_code, 422)
+        self.client.patch('/api/admin/products/1', headers=self.auth, json={'hidden':True}).raise_for_status()
+        self.assertEqual(self.client.get('/api/products?ids=1').json()['total'], 0)
+        self.assertEqual(self.client.get('/api/favorites', headers=self.auth).json()['ids'], [])
+
+    def test_image_routes_cached_and_protected_by_product_visibility(self):
+        url = 'https://grasser.ru/test.jpg'
+        with self.db.connect() as db:
+            db.execute('UPDATE products SET image_url=?,image_urls=? WHERE id=1', (url,json.dumps([url,'https://grasser.ru/back.jpg'])))
+        asset = MediaRepository(self.db)
+        asset.register(image_key(url),url)
+        path = Path(self.temp.name) / 'test.webp'; path.write_bytes(b'cached-test-image')
+        images = self.client.app.state.images
+        with patch.object(images,'get',new=AsyncMock(return_value=path)):
+            response = self.client.get('/api/products/1/image/0')
+            self.assertEqual(response.status_code,200)
+            self.assertIn('max-age=86400',response.headers['cache-control'])
+            self.assertEqual(self.client.get('/api/products/1/image/0',headers={'If-None-Match':response.headers['etag']}).status_code,304)
+            self.assertEqual(self.client.get('/api/products/1/image/9').status_code,404)
+            self.client.patch('/api/admin/products/1',headers=self.auth,json={'hidden':True}).raise_for_status()
+            self.assertEqual(self.client.get('/api/products/1/image/0').status_code,404)
+        detail = self.client.get('/api/admin/products?ids=1',headers=self.auth).json()['items'][0]
+        self.assertEqual(detail['image_count'],2)
+        self.assertEqual(len(detail['photo_urls']),2)
+
+    def test_changed_image_url_can_use_last_successful_cover(self):
+        from app.services.images import ImageUnavailable
+        asset = MediaRepository(self.db)
+        old = 'https://grasser.ru/old.jpg'
+        new = 'https://grasser.ru/new.jpg'
+        asset.register(image_key(old),old)
+        asset.ready(image_key(old))
+        asset.set_cover(1,image_key(old))
+        images = self.client.app.state.images
+        path = images.cached_path(old,'thumb'); path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(b'last-working-cover')
+        with self.db.connect() as db:
+            db.execute('UPDATE products SET image_url=? WHERE id=1',(new,))
+        with patch.object(images,'get',new=AsyncMock(side_effect=ImageUnavailable('preparing'))):
+            response = self.client.get('/api/products/1/image/0')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.content,b'last-working-cover')
+        dashboard = self.client.get('/api/admin/media',headers=self.auth)
+        self.assertEqual(dashboard.status_code,200)
+        self.assertEqual(dashboard.json()['cached'],1)
+        self.assertEqual(self.client.get('/api/admin/media').status_code,401)
 
 
 if __name__ == "__main__":

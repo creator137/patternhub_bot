@@ -19,12 +19,15 @@ install -m 644 "$app_dir/deploy/allsewpattern-bot.service" /etc/systemd/system/
 install -m 644 "$app_dir/deploy/allsewpattern-web.service" /etc/systemd/system/
 install -m 644 "$app_dir/deploy/allsewpattern-refresh.service" /etc/systemd/system/
 install -m 644 "$app_dir/deploy/allsewpattern-refresh.timer" /etc/systemd/system/
+install -m 644 "$app_dir/deploy/allsewpattern-media.service" "$app_dir/deploy/allsewpattern-media.timer" /etc/systemd/system/
+install -m 644 "$app_dir/deploy/allsewpattern-galleries.service" "$app_dir/deploy/allsewpattern-galleries.timer" /etc/systemd/system/
 install -m 644 "$app_dir/deploy/nginx.conf" /etc/nginx/sites-available/allsewpattern
+install -m 644 "$app_dir/deploy/http-performance.conf" /etc/nginx/conf.d/allsewpattern-performance.conf
 ln -sfn /etc/nginx/sites-available/allsewpattern /etc/nginx/sites-enabled/allsewpattern
 systemctl daemon-reload
 systemctl enable --now allsewpattern-web
 nginx -t
 systemctl reload nginx
 certbot --nginx -d allsewpattern.2.56.240.132.sslip.io --non-interactive --agree-tos --register-unsafely-without-email --redirect
-systemctl enable --now allsewpattern-bot allsewpattern-refresh.timer
+systemctl enable --now allsewpattern-bot allsewpattern-refresh.timer allsewpattern-media.timer allsewpattern-galleries.timer
 systemctl --no-pager is-active allsewpattern-bot allsewpattern-web nginx

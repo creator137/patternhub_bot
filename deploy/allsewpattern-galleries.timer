@@ -1,0 +1,10 @@
+[Unit]
+Description=Discover new allsewpattern gallery photos incrementally
+
+[Timer]
+OnBootSec=3m
+OnUnitInactiveSec=5m
+Unit=allsewpattern-galleries.service
+
+[Install]
+WantedBy=timers.target

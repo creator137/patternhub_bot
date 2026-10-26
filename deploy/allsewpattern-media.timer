@@ -1,0 +1,10 @@
+[Unit]
+Description=Process new and failed allsewpattern photos every five minutes
+
+[Timer]
+OnBootSec=2m
+OnUnitInactiveSec=5m
+Unit=allsewpattern-media.service
+
+[Install]
+WantedBy=timers.target

@@ -13,6 +13,7 @@ class Database:
     def initialize(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
+            connection.execute('PRAGMA journal_mode=WAL')
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS settings (
@@ -67,12 +68,38 @@ class Database:
                     ON products(source);
                 CREATE INDEX IF NOT EXISTS idx_products_category
                     ON products(category);
+                CREATE INDEX IF NOT EXISTS idx_products_image_url
+                    ON products(image_url);
+                CREATE INDEX IF NOT EXISTS idx_products_product_url
+                    ON products(product_url);
                 """
             )
             self._ensure_column(connection, "products", "is_new", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(connection, "products", "audience", "TEXT")
             self._ensure_column(connection, "products", "telegram_file_id", "TEXT")
             self._ensure_column(connection, "products", "image_status", "TEXT")
+            self._ensure_column(connection, "products", "image_urls", "TEXT")
+            self._ensure_column(connection, "products", "gallery_checked_at", "TEXT")
+            connection.executescript("""CREATE TABLE IF NOT EXISTS media_assets (
+                key TEXT PRIMARY KEY, url TEXT NOT NULL, referer TEXT,
+                state TEXT NOT NULL DEFAULT 'pending', priority INTEGER NOT NULL DEFAULT 100,
+                attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0,
+                lease_until REAL NOT NULL DEFAULT 0, lease_owner TEXT, last_success REAL NOT NULL DEFAULT 0,
+                last_access REAL NOT NULL DEFAULT 0, last_error TEXT);
+                CREATE INDEX IF NOT EXISTS idx_media_due ON media_assets(state,next_attempt,priority);
+                CREATE TABLE IF NOT EXISTS product_media_cache (
+                    product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+                    asset_key TEXT NOT NULL REFERENCES media_assets(key));
+                CREATE TABLE IF NOT EXISTS media_gallery_jobs (
+                    product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+                    attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0,
+                    last_error TEXT);
+            """)
+            connection.execute("""CREATE TABLE IF NOT EXISTS favorites (
+                user_id INTEGER NOT NULL, product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(user_id,product_id))""")
+            self._ensure_column(connection, 'media_assets', 'lease_owner', 'TEXT')
             self._ensure_column(
                 connection, "products", "is_beginner", "INTEGER NOT NULL DEFAULT 0"
             )

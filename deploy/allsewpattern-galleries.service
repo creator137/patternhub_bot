@@ -1,0 +1,21 @@
+[Unit]
+Description=Enrich allsewpattern product galleries in small batches
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=allsewpattern
+Group=allsewpattern
+WorkingDirectory=/opt/allsewpattern
+EnvironmentFile=/opt/allsewpattern/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/flock -n -E 0 /opt/allsewpattern/data/galleries.lock /opt/allsewpattern/.venv/bin/python -m app.media --mode galleries --limit 50
+TimeoutStartSec=1h
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/allsewpattern/data
+UMask=0077

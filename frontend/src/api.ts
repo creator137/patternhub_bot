@@ -9,6 +9,11 @@ export type Product = {
   old_price: string | null;
   currency: string | null;
   image_url: string | null;
+  image_urls?: string[];
+  thumbnail_url?: string | null;
+  photo_urls?: string[];
+  photo_thumbnails?: string[];
+  image_count?: number;
   product_url: string | null;
   description: string | null;
   sizes: string[] | null;
@@ -67,6 +72,7 @@ export async function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (tg?.initData) headers["X-Telegram-Init-Data"] = tg.initData;
@@ -76,11 +82,13 @@ export async function api<T>(
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   });
   if (!response.ok)
     throw new Error(
-      response.status === 401 || response.status === 403
-        ? "Нет доступа. Откройте приложение из Telegram с аккаунта администратора или введите локальный ключ."
+      response.status === 401
+        ? "Сессия истекла. Переоткройте каталог из Telegram."
+        : response.status === 403 ? "Для этого действия нужны права администратора."
         : `Не удалось выполнить запрос (${response.status}). Попробуйте ещё раз.`,
     );
   return response.json();

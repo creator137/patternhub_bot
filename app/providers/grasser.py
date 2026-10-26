@@ -316,6 +316,10 @@ class GrasserProvider(BaseProvider):
         next_pages = [page for page in candidates if page > current_page]
         return min(next_pages) if next_pages else None
 
+    def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
+        from app.providers.gallery import html_gallery
+        return html_gallery(html, product_url, '.product__slider-big img')
+
     def parse_product_page(
         self, html: str, product_url: str, seed: ParsedProduct | None = None
     ) -> ParsedProduct:
@@ -406,13 +410,21 @@ class GrasserProvider(BaseProvider):
 
     @staticmethod
     def _extract_image_url(card: Tag, page_url: str) -> str | None:
-        node = card.select_one(".catalog-block__image img[src], .catalog-block__image source[srcset]")
-        if not node:
-            return None
-        value = node.get("src") or node.get("srcset")
-        if not value:
-            return None
-        return urljoin(page_url, str(value).split(",")[0].split()[0])
+        selectors = (
+            '.catalog-block__image .b-mini-slide source[srcset], .catalog-block__image .b-mini-slide img',
+            '.catalog-block__image picture source[srcset], .catalog-block__image picture img',
+            '.catalog-block__image img, .catalog-block__image source[srcset]',
+        )
+        for selector in selectors:
+            for node in card.select(selector):
+                value = node.get('data-src') or node.get('srcset') or node.get('src')
+                if not value:
+                    continue
+                url = urljoin(page_url, str(value).split(',')[0].split()[0])
+                if '/local/templates/' in url or url.startswith('data:'):
+                    continue
+                return url
+        return None
 
     @staticmethod
     def _source_product_id(card: Tag, name: str) -> str | None:

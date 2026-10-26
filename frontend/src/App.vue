@@ -25,7 +25,12 @@ import {
   type Product,
 } from "./api";
 import ProductImage from "./ProductImage.vue";
+import ProductGallery from "./ProductGallery.vue";
 import Admin from "./Admin.vue";
+import { useFavorites } from './useFavorites';
+const favorites = useFavorites();
+const savedOnly = ref(false);
+let savedReturnFilters: Record<string, string | boolean | null> | null = null;
 const meta = ref<Meta | null>(null),
   items = ref<Product[]>([]),
   total = ref(0),
@@ -51,6 +56,12 @@ const filters = reactive<Record<string, string | boolean | null>>({
   is_knit: null,
   sort: "name",
 });
+try {
+  const stored = JSON.parse(sessionStorage.getItem('allsewpattern.filters') || '{}');
+  for (const key of Object.keys(filters))
+    if (stored && key in stored && (stored[key] === null || ['string', 'boolean'].includes(typeof stored[key]))) filters[key] = stored[key];
+} catch { /* browsing remains available without storage */ }
+let listRequest: AbortController | null = null;
 const sortOptions = [
   { label: "По названию", value: "name" },
   { label: "Сначала дешевле", value: "price_asc" },
@@ -75,6 +86,7 @@ let requestId = 0,
   scroll = 0;
 function query(offset = 0) {
   const p = new URLSearchParams({ offset: String(offset) });
+  if (savedOnly.value) p.set('ids', favorites.ids.value.join(','));
   for (const [key, value] of Object.entries(filters))
     if (enabled.value.includes(key) && value !== null && value !== "")
       p.set(key, String(value));
@@ -82,11 +94,17 @@ function query(offset = 0) {
 }
 async function load(more = false) {
   const id = ++requestId;
+  listRequest?.abort();
+  listRequest = new AbortController();
   loading.value = true;
   error.value = "";
+  if (savedOnly.value && !favorites.ids.value.length) {
+    items.value = []; total.value = 0; loading.value = false; return;
+  }
   try {
     const result = await api<Page>(
       "/products?" + query(more ? items.value.length : 0),
+      'GET', undefined, listRequest.signal,
     );
     if (id !== requestId) return;
     items.value = more ? [...items.value, ...result.items] : result.items;
@@ -109,6 +127,19 @@ function reset() {
 function toggle(key: string) {
   filters[key] = filters[key] ? null : true;
 }
+function toggleSavedView() {
+  if (!savedOnly.value) {
+    savedReturnFilters = { ...filters };
+    reset(); savedOnly.value = true;
+  } else {
+    savedOnly.value = false;
+    if (savedReturnFilters) Object.assign(filters, savedReturnFilters);
+  }
+  location.hash = '';
+  window.scrollTo(0, 0);
+  load();
+}
+watch(favorites.ids, () => { if (savedOnly.value) load(); });
 function selectSection(audience: string | null) {
   // Header tabs are navigation; the Drawer still supports combined filters.
   for (const key in filters) if (key !== 'sort') filters[key] = null;
@@ -182,6 +213,7 @@ async function changed() {
   }
 }
 watch(filters, () => {
+  try { sessionStorage.setItem('allsewpattern.filters', JSON.stringify(filters)); } catch { /* optional storage */ }
   clearTimeout(timer);
   ++requestId;
   timer = setTimeout(() => load(), 250);
@@ -198,6 +230,7 @@ onMounted(async () => {
   try {
     await refreshMeta();
     await load();
+    await favorites.initialize();
     if (tg?.initData) {
       try {
         await api("/admin/session");
@@ -213,6 +246,7 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
+  listRequest?.abort();
   clearTimeout(timer);
   window.removeEventListener("hashchange", routeChanged);
   scheme.removeEventListener("change", theme);
@@ -227,8 +261,9 @@ onUnmounted(() => {
       <span>allsewpattern</span></a
     >
     <div class="header-right">
-      <span class="desktop muted">Ваше следующее любимое изделие</span
-      ><button
+      <button class="icon-btn saved-nav" :class="{ active: savedOnly }" :aria-label="'Избранное (' + favorites.ids.value.length + ')'" title="Избранное" @click="toggleSavedView">
+        <i :class="savedOnly ? 'pi pi-heart-fill' : 'pi pi-heart'" /><span v-if="favorites.ids.value.length" class="saved-count">{{ favorites.ids.value.length }}</span>
+      </button><button
         v-if="admin || meta?.local_login"
         class="icon-btn"
         aria-label="Управление"
@@ -239,6 +274,7 @@ onUnmounted(() => {
     </div>
   </header>
   <main>
+    <div v-if="favorites.notice.value" class="favorite-notice" role="status">{{ favorites.notice.value }}<button class="icon-btn" aria-label="Закрыть уведомление" @click="favorites.notice.value = ''"><i class="pi pi-times" /></button></div>
     <template v-if="route === '#/admin'"
       ><button class="back" @click="back">← В каталог</button
       ><Admin v-if="admin && meta" :meta="meta" @changed="changed" />
@@ -265,10 +301,13 @@ onUnmounted(() => {
         <Button label="Повторить" @click="routeChanged" />
       </div>
       <article v-else-if="detail" class="detail">
-        <ProductImage :src="detail.image_url" :alt="detail.name" />
+        <ProductGallery :product="detail" />
         <div class="detail-info">
           <p class="eyebrow">{{ detail.brand || detail.source }}</p>
           <h1>{{ detail.name }}</h1>
+          <button class="detail-save" :aria-pressed="favorites.ids.value.includes(detail.id)" :disabled="favorites.pending.value.has(detail.id)" @click="favorites.toggle(detail.id)">
+            <i :class="favorites.ids.value.includes(detail.id) ? 'pi pi-heart-fill' : 'pi pi-heart'" />{{ favorites.ids.value.includes(detail.id) ? 'В избранном' : 'В избранное' }}
+          </button>
           <p class="price large">
             {{ money(detail) }}
             <del v-if="detail.is_sale && detail.old_price">{{
@@ -319,26 +358,10 @@ onUnmounted(() => {
       </article></template
     >
     <template v-else>
-      <section class="hero">
-        <div>
-          <p class="eyebrow">МНОГО БРЕНДОВ. ВАШ СТИЛЬ.</p>
-          <h1>Всё начинается<br />с <em>выкройки.</em></h1>
-          <p>
-            Находите свои силуэты. Сравнивайте бренды.<br />Создавайте то, что
-            хочется носить.
-          </p>
-        </div>
-        <div class="hero-art" aria-hidden="true">
-          <span class="stitch s1"></span><span class="stitch s2"></span
-          ><span class="art-caption">PATTERN № 01<br />made by you</span
-          ><i class="pi pi-sparkles"></i>
-        </div>
-      </section>
       <section class="catalog">
         <div class="row catalog-heading">
           <div>
-            <p class="eyebrow">ПОДБОРКА ДЛЯ ВАШИХ ИДЕЙ</p>
-            <h2>Каталог выкроек</h2>
+            <h2>{{ savedOnly ? 'Избранное' : 'Каталог выкроек' }}</h2>
           </div>
           <span class="muted" aria-live="polite"
             >{{ total.toLocaleString("ru-RU") }} найдено</span
@@ -463,21 +486,21 @@ onUnmounted(() => {
         </div>
         <div v-else-if="!items.length" class="empty">
           <i class="pi pi-search"></i>
-          <h2>Пока ничего не нашлось</h2>
+          <h2>{{ savedOnly && !favorites.ids.value.length ? 'Здесь будут любимые выкройки' : 'Пока ничего не нашлось' }}</h2>
           <p>
-            Попробуйте другой бренд или уберите часть фильтров.<br />Если
-            каталог пуст, импортируйте товары через существующий parser.
+            {{ savedOnly && !favorites.ids.value.length ? 'Сохраняйте понравившиеся модели сердечком.' : 'Попробуйте другой бренд, название или уберите часть фильтров.' }}
           </p>
-          <Button label="Сбросить фильтры" outlined @click="reset" />
+          <Button v-if="savedOnly && !favorites.ids.value.length" label="В каталог" outlined @click="toggleSavedView" />
+          <Button v-else label="Сбросить фильтры" outlined @click="reset" />
         </div>
         <div v-else class="product-grid" :aria-busy="loading">
-          <button
-            v-for="p in items"
+          <article
+            v-for="(p, index) in items"
             :key="p.id"
             class="product-card"
-            @click="open(p)"
           >
-            <ProductImage :src="p.image_url" :alt="p.name"
+            <a class="product-open" :href="'#/product/' + p.id" @click.prevent="open(p)">
+            <ProductImage :src="p.thumbnail_url || p.image_url" :fallback-src="p.image_url" :alt="p.name" :eager="index < 4"
               ><div class="badges">
                 <span v-if="p.is_new">NEW</span
                 ><span v-if="p.is_sale" class="sale">СКИДКА</span
@@ -485,6 +508,7 @@ onUnmounted(() => {
               </div>
               <span class="card-arrow"
                 ><i class="pi pi-arrow-up-right"></i></span
+              ><span v-if="p.image_count && p.image_count > 1" class="photo-count"><i class="pi pi-images" /> {{ p.image_count }}</span
             ></ProductImage>
             <div class="card-info">
               <p class="brand">{{ p.brand || p.source }}</p>
@@ -496,7 +520,11 @@ onUnmounted(() => {
                 }}</del>
               </p>
             </div>
-          </button>
+            </a>
+            <button class="save-product" :aria-label="(favorites.ids.value.includes(p.id) ? 'Убрать из избранного: ' : 'Сохранить: ') + p.name" :aria-pressed="favorites.ids.value.includes(p.id)" :disabled="favorites.pending.value.has(p.id)" :title="favorites.ids.value.includes(p.id) ? 'Убрать из избранного' : 'В избранное'" @click="favorites.toggle(p.id)">
+              <i :class="favorites.ids.value.includes(p.id) ? 'pi pi-heart-fill' : 'pi pi-heart'" />
+            </button>
+          </article>
         </div>
         <div v-if="items.length < total && !error" class="load-more">
           <Button
