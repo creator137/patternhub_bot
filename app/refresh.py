@@ -1,5 +1,6 @@
 """Sequential catalog refresh with a local SQLite backup before importing."""
 import asyncio
+from contextlib import closing
 from datetime import datetime, timezone
 import logging
 import sqlite3
@@ -18,7 +19,7 @@ async def refresh() -> int:
     backup_dir = config.database_path.parent / "backups"
     backup_dir.mkdir(exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
-    with sqlite3.connect(backup_dir / f"catalog-{stamp}.sqlite3") as target:
+    with closing(sqlite3.connect(backup_dir / f"catalog-{stamp}.sqlite3")) as target:
         with database.connect() as source:
             source.backup(target)
     for old in sorted(backup_dir.glob("catalog-*.sqlite3"))[:-7]:
