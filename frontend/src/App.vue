@@ -27,6 +27,8 @@ import {
 import ProductImage from "./ProductImage.vue";
 import ProductGallery from "./ProductGallery.vue";
 import Admin from "./Admin.vue";
+import Suppliers from './Suppliers.vue';
+import {alphabetically,type Supplier} from './api';
 import { useFavorites } from './useFavorites';
 const favorites = useFavorites();
 const savedOnly = ref(false);
@@ -117,13 +119,19 @@ async function load(more = false) {
   }
 }
 async function refreshMeta() {
-  meta.value = await api<Meta>("/meta");
+  const value = await api<Meta>("/meta");
+  value.brands = alphabetically(value.brands, brand=>brand.name);
+  meta.value = value;
   for (const key of Object.keys(filters))
     if (!enabled.value.includes(key))
       filters[key] = key === "sort" ? "name" : null;
 }
 function reset() {
-  for (const key in filters) filters[key] = key === "sort" ? "new_first" : null;
+  for (const key in filters) filters[key] = key === "sort" ? (enabled.value.includes('sort')?'new_first':'name') : null;
+}
+function browseSupplier(supplier:Supplier) {
+  reset(); savedOnly.value=false; filters.source=supplier.source;
+  location.hash=''; window.scrollTo(0,0);
 }
 function toggle(key: string) {
   filters[key] = filters[key] ? null : true;
@@ -275,6 +283,10 @@ onUnmounted(() => {
     </div>
   </header>
   <main>
+    <nav v-if="!route.startsWith('#/product/') && route!=='#/admin'" class="view-tabs" aria-label="Разделы каталога">
+      <a href="#" :class="{active:route!=='#/suppliers'}">Выкройки</a>
+      <a href="#/suppliers" :class="{active:route==='#/suppliers'}">Поставщики <small>{{meta?.supplier_count || ''}}</small></a>
+    </nav>
     <div v-if="favorites.notice.value" class="favorite-notice" role="status">{{ favorites.notice.value }}<button class="icon-btn" aria-label="Закрыть уведомление" @click="favorites.notice.value = ''"><i class="pi pi-times" /></button></div>
     <template v-if="route === '#/admin'"
       ><button class="back" @click="back">← В каталог</button
@@ -293,6 +305,7 @@ onUnmounted(() => {
         <p v-if="loginError" class="error" role="alert">{{ loginError }}</p>
       </section></template
     >
+    <Suppliers v-else-if="route==='#/suppliers'" @browse="browseSupplier"/>
     <template v-else-if="route.startsWith('#/product/')"
       ><button class="back" @click="back">← К выкройкам</button
       ><Skeleton v-if="detailLoading" height="30rem" />
@@ -466,7 +479,7 @@ onUnmounted(() => {
             {{ entry.title }} <span aria-hidden="true">×</span>
           </button>
         </div>
-        <p v-if="meta?.coverage.unknown_audience" class="muted small" role="note">
+        <p v-if="enabled.includes('audience') && meta?.coverage.unknown_audience" class="muted small" role="note">
           У {{ meta.coverage.unknown_audience }} выкроек аудитория пока не определена:
           они доступны в разделе «Все выкройки».
         </p>
@@ -477,7 +490,7 @@ onUnmounted(() => {
             Весь каталог, сначала новинки
           </button>
         </p>
-        <p v-else-if="filters.sort === 'new_first'" class="muted small" role="note">
+        <p v-else-if="enabled.includes('sort') && filters.sort === 'new_first'" class="muted small" role="note">
           {{ filters.source ? 'Все подходящие выкройки — от новых моделей к старым.' : 'Сначала свежие модели каждого бренда.' }}
         </p>
         <p v-if="filters.is_free" class="muted small" role="note">

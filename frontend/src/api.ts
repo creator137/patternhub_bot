@@ -36,6 +36,8 @@ export type Product = {
 export type UIItem = { key: string; enabled: boolean };
 export type UISettings = { filters: UIItem[]; menu: UIItem[] };
 export type Meta = {
+  common_filters: string[];
+  supplier_count: number;
   coverage: {counts: Record<string,number>; unknown_audience:number; total:number; publication_dates?:number; new_window_days?:number; recency_ordered?:number};
   ui: UISettings;
   categories: { name: string; count: number }[];
@@ -51,7 +53,16 @@ export type Source = {
   enabled: boolean;
   products: number;
   parser_status: string;
+  specialization?: string;
 };
+export type Supplier = {source:string;name:string;url:string;base_url:string;specialization:string;products:number};
+export function alphabetically<T>(items:T[], name:(item:T)=>string):T[] {
+  return [...items].sort((a,b)=>name(a).localeCompare(name(b),'ru',{sensitivity:'base',numeric:true}));
+}
+export const supplierSpecializations = [
+  {value:'general',label:'Выкройки одежды'}, {value:'lingerie',label:'Нижнее бельё'},
+  {value:'kids',label:'Детские выкройки'}, {value:'bags',label:'Сумки'}, {value:'pets',label:'Для животных'},
+];
 type Telegram = {
   initData: string;
   colorScheme: string;
@@ -89,12 +100,16 @@ export async function api<T>(
     signal,
   });
   if (!response.ok)
+    {
+    const detail = response.status===409 ? await response.json().catch(()=>null) : null;
     throw new Error(
       response.status === 401
         ? "Сессия истекла. Переоткройте каталог из Telegram."
         : response.status === 403 ? "Для этого действия нужны права администратора."
+        : typeof detail?.detail==='string' ? detail.detail
         : `Не удалось выполнить запрос (${response.status}). Попробуйте ещё раз.`,
     );
+    }
   return response.json();
 }
 export function money(p: Product) {

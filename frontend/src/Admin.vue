@@ -14,6 +14,8 @@ import {
   type Product,
   type UISettings,
   type UIItem,
+  alphabetically,
+  supplierSpecializations,
 } from "./api";
 import ProductImage from "./ProductImage.vue";
 const props = defineProps<{ meta: Meta }>();
@@ -27,6 +29,7 @@ const tab = ref("sources"),
 const ui = ref<UISettings>(JSON.parse(JSON.stringify(props.meta.ui)));
 const name = ref(""),
   url = ref(""),
+  specialization = ref('general'),
   search = ref(""),
   products = ref<Product[]>([]),
   total = ref(0),
@@ -47,7 +50,7 @@ async function action(fn: () => Promise<void>) {
   }
 }
 async function loadSources() {
-  sources.value = await api<Source[]>("/admin/sources");
+  sources.value = alphabetically(await api<Source[]>("/admin/sources"),source=>source.display_name);
   try { media.value = await api('/admin/media'); } catch { /* Source management remains available. */ }
 }
 async function loadProducts(more = false) {
@@ -66,9 +69,11 @@ async function changeTab(value: string) {
     error.value = (e as Error).message;
   }
 }
-function move(list: UIItem[], index: number) {
-  if (index > 0)
-    [list[index - 1], list[index]] = [list[index], list[index - 1]];
+function move(list: UIItem[], entry:UIItem) {
+  const index=list.indexOf(entry);
+  let previous=index-1;
+  while(previous>=0 && !props.meta.common_filters.includes(list[previous].key))previous--;
+  if(previous>=0)[list[previous],list[index]]=[list[index],list[previous]];
 }
 function edit(p: Product) {
   selected.value = p;
@@ -98,7 +103,7 @@ onMounted(async () => {
       <button
         v-for="item in [
           ['sources', 'Источники'],
-          ['filters', 'Фильтры и меню'],
+          ['filters', 'Фильтры каталога'],
           ['products', 'Товары'],
         ]"
         :key="item[0]"
@@ -135,9 +140,9 @@ onMounted(async () => {
           }}</a>
           <p>{{ s.products }} товаров</p>
           <small :class="{ muted: s.parser_status === 'pending' }">{{
-            s.parser_status === "connected"
-              ? "Адаптер подключён"
-              : "Ожидает подключения парсера"
+            s.products > 0
+              ? "Выкройки доступны в каталоге"
+              : "Переход на сайт поставщика"
           }}</small>
         </article>
       </div>
@@ -148,9 +153,11 @@ onMounted(async () => {
             await api('/admin/sources', 'POST', {
               display_name: name,
               base_url: url,
+              specialization,
             });
             name = '';
             url = '';
+            specialization = 'general';
             await loadSources();
           })
         "
@@ -165,21 +172,23 @@ onMounted(async () => {
             placeholder="https://"
             required
         /></label>
+        <label>Направление<Select v-model="specialization" :options="supplierSpecializations" optionLabel="label" optionValue="value" aria-label="Направление поставщика"/></label>
         <p class="muted">
-          Добавляет только запись. Для импорта нужен отдельный provider.
+          После включения сайт появится в разделе «Поставщики». Отдельные выкройки
+          добавляются после подключения каталога.
         </p>
         <Button type="submit" label="Добавить сайт" :disabled="busy" /></form
     ></template>
     <template v-if="tab === 'filters'"
       ><div class="admin-grid">
         <section
-          v-for="group in ['filters', 'menu'] as const"
+          v-for="group in ['filters'] as const"
           :key="group"
           class="panel"
         >
-          <h2>{{ group === "filters" ? "Фильтры" : "Главное меню" }}</h2>
+          <h2>Общие фильтры</h2>
           <div
-            v-for="(entry, index) in ui[group]"
+            v-for="(entry, index) in ui[group].filter(entry=>props.meta.common_filters.includes(entry.key))"
             :key="entry.key"
             class="setting-row"
           >
@@ -192,7 +201,7 @@ onMounted(async () => {
               :aria-label="'Поднять ' + labels[entry.key]"
               :disabled="index === 0"
               text
-              @click="move(ui[group], index)"
+              @click="move(ui[group], entry)"
             />
           </div>
         </section>

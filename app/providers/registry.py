@@ -8,6 +8,7 @@ from app.providers.helpersew import HelperSewProvider
 from app.providers.sewitnow import SewItNowProvider
 from app.providers.studio_yusupova import StudioYusupovaProvider
 from app.providers.vikisews import VikiSewsProvider
+from app.suppliers import supplier_definition, supplier_definitions
 
 
 def create_provider(source: str, **kwargs: object) -> BaseProvider:
@@ -18,10 +19,15 @@ def create_provider(source: str, **kwargs: object) -> BaseProvider:
         "studio_yusupova": StudioYusupovaProvider,
         "sewitnow": SewItNowProvider,
     }
-    try:
-        provider_class = providers[source]
-    except KeyError as error:
-        raise ValueError(f"Unknown or not implemented source: {source}") from error
+    if source not in providers:
+        from app.providers.public_stores import WooStoreProvider, WooHTMLProvider, TildaSitemapProvider, VigboProvider
+        definition = supplier_definition(source)
+        adapters = {'woo_store':WooStoreProvider, 'woo_html':WooHTMLProvider, 'tilda_sitemap':TildaSitemapProvider,'vigbo':VigboProvider}
+        if not definition or definition.get('adapter') not in adapters:
+            raise ValueError(f"Unknown or not implemented source: {source}")
+        return adapters[definition['adapter']](definition,
+            **{key:value for key,value in kwargs.items() if key in {'max_pages','transport'}})
+    provider_class = providers[source]
     signature = inspect.signature(provider_class)
     supported_kwargs = {
         key: value for key, value in kwargs.items() if key in signature.parameters
@@ -30,4 +36,6 @@ def create_provider(source: str, **kwargs: object) -> BaseProvider:
 
 
 def available_providers() -> tuple[str, ...]:
-    return ("vikisews", "grasser", "helpersew", "studio_yusupova", "sewitnow")
+    original = ("vikisews", "grasser", "helpersew", "studio_yusupova", "sewitnow")
+    return original + tuple(item['source'] for item in supplier_definitions()
+                            if item.get('adapter') not in {None,'existing'} and item['enabled'])

@@ -427,7 +427,8 @@ class CatalogHandlerTests(unittest.IsolatedAsyncioTestCase):
     async def test_main_menu_replaces_unisex_with_all_brands(self) -> None:
         message = SimpleNamespace(answer=AsyncMock(), chat=SimpleNamespace(type="private"))
 
-        await show_main_menu(message, self.service)
+        with patch('app.handlers.catalog.load_settings', return_value=SimpleNamespace(miniapp_url=None)):
+            await show_main_menu(message, self.service)
 
         keyboard_text = str(message.answer.await_args.kwargs["reply_markup"])
         self.assertIn("🏷 Все бренды", keyboard_text)

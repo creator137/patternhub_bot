@@ -161,6 +161,22 @@ class Database:
                     ("sewitnow", "SewItNow", "https://sewitnow.ru", 1),
                 ),
             )
+            from app.suppliers import supplier_definitions
+            self._ensure_column(connection, 'sources', 'catalog_url', 'TEXT')
+            self._ensure_column(connection, 'sources', 'specialization', "TEXT NOT NULL DEFAULT 'general'")
+            connection.executemany('''INSERT OR IGNORE INTO sources
+                (name,display_name,base_url,enabled,catalog_url,specialization) VALUES(?,?,?,?,?,?)''',
+                [(item['source'],item['display_name'],item['base_url'],int(item['enabled']),
+                  item['catalog_url'],item['specialization']) for item in supplier_definitions()])
+            connection.executemany('''UPDATE sources SET catalog_url=?,specialization=?
+                WHERE name=? AND catalog_url IS NULL''',
+                [(item['catalog_url'],item['specialization'],item['source']) for item in supplier_definitions()])
+            if not connection.execute("SELECT 1 FROM settings WHERE key='taxonomy.bags.v1'").fetchone():
+                from app.models.categories import normalize_product_category
+                rows = connection.execute("SELECT id,name,category FROM products WHERE category='Аксессуары'").fetchall()
+                connection.executemany('UPDATE products SET category=? WHERE id=?',
+                    [(normalize_product_category(row['category'],row['name']), row['id']) for row in rows])
+                connection.execute("INSERT INTO settings(key,value) VALUES('taxonomy.bags.v1','1')")
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS product_overrides (
                     product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,

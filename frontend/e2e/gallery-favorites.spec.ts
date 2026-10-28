@@ -19,9 +19,10 @@ test('favorites survive reload; catalog remains compact and returns from detail'
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('real Rika gallery: thumbnails, next/back, lightbox and zoom', async ({ page, request }) => {
-  const response = await request.get('/api/products?search=' + encodeURIComponent('Берет Рика'));
-  const product = (await response.json()).items[0];
+test('real Rika gallery: thumbnails, next/back, lightbox and zoom', async ({ page }) => {
+  await page.goto('/');
+  const data = await page.evaluate(async()=>await(await fetch('/api/products?search='+encodeURIComponent('Берет Рика'))).json());
+  const product = data.items[0];
   test.skip(!product || product.image_count < 2, 'Run offline gallery enrichment for Rika first');
   await page.goto('/#/product/' + product.id);
   const stage = page.locator('.gallery-stage');

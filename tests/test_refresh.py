@@ -25,7 +25,8 @@ class RefreshTests(unittest.IsolatedAsyncioTestCase):
             synchronize.assert_awaited_once_with("vikisews")
             backup = next((Path(directory) / "backups").glob("*.sqlite3"))
             with Database(backup).connect() as db:
-                self.assertEqual(db.execute("SELECT COUNT(*) FROM sources").fetchone()[0], 5)
+                from app.suppliers import supplier_definitions
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM sources").fetchone()[0], len(supplier_definitions()))
 
     async def test_source_failure_does_not_stop_other_sources(self):
         with TemporaryDirectory() as directory:

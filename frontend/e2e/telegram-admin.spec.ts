@@ -32,7 +32,7 @@ for (const [index, username] of ["shanniwaby", "tatiana_svetlic"].entries()) {
     await page.screenshot({ path: `test-results/telegram-${username}-catalog.png` });
     await page.getByRole("button", { name: "Управление", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Управление", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Фильтры и меню", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Фильтры каталога", exact: true })).toBeVisible();
     await page.screenshot({ path: `test-results/telegram-${username}-admin.png` });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: `test-results/telegram-${username}-admin-desktop.png` });

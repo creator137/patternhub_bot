@@ -7,7 +7,7 @@ from decimal import Decimal
 from urllib.parse import urlsplit, urlunsplit
 
 from app.models.audience import normalize_audience
-from app.models.categories import normalize_category
+from app.models.categories import normalize_product_category
 from app.models.catalog_policy import publication_datetime, is_recent_publication
 
 
@@ -106,7 +106,7 @@ class ParsedProduct:
         is_free = self.is_free or price == Decimal("0.00")
         is_sale = price is not None and old_price is not None and old_price > price
         subcategory = _clean_text(self.subcategory)
-        category = normalize_category(self.category)
+        category = normalize_product_category(self.category, name)
         difficulty = _clean_text(self.difficulty)
         description = _clean_text(self.description)
         is_beginner = True if _has_beginner_marker(

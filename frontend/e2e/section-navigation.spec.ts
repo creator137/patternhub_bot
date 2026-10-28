@@ -1,19 +1,12 @@
 import {test,expect} from '@playwright/test';
-
-test('audience navigation clears previous quick filters instead of opening an empty intersection',async({page})=>{
-  await page.goto('/');
-  await expect(page.locator('.product-card').first()).toBeVisible();
-  for(const [quick,audience,label] of [['За последние 60 дней','men','Мужские'],['Бесплатные','unisex','Унисекс']]){
-    await page.locator('.quick').getByRole('button',{name:new RegExp(quick)}).click();
-    await expect(page.getByRole('button',{name:new RegExp('^Убрать фильтр: '+quick)})).toBeVisible();
-    const response=page.waitForResponse(r=>r.url().includes('/api/products?')&&new URL(r.url()).searchParams.get('audience')===audience);
-    await page.locator('.audiences').getByRole('button',{name:new RegExp('^'+label)}).click();
-    const result=await response;
-    const params=new URL(result.url()).searchParams;
-    expect(params.has('is_new')).toBe(false);
-    expect(params.has('is_free')).toBe(false);
-    expect((await result.json()).total).toBeGreaterThan(0);
-    await expect(page.locator('.product-card').first()).toBeVisible();
-    await expect(page.locator('.active-filters')).toHaveCount(0);
-  }
+test('supplier catalog selection clears unrelated filters',async({page})=>{
+ await page.goto('/#/suppliers');await page.getByRole('textbox',{name:'Поиск поставщика'}).fill('VikiSews');
+ const response=page.waitForResponse(r=>r.url().includes('/api/products?')&&r.url().includes('source=vikisews'));
+ await page.locator('.supplier-card').getByRole('button',{name:/Выкройки/}).click();
+ const result=await response;const params=new URL(result.url()).searchParams;
+ for(const key of ['audience','is_new','is_sale','is_knit','is_beginner'])expect(params.has(key)).toBe(false);
+ expect((await result.json()).items.every((p:{source:string})=>p.source==='vikisews')).toBe(true);
+ await expect(page.locator('.product-card').first()).toBeVisible();
+ await page.locator('.view-tabs').getByRole('link',{name:/Поставщики/}).click();
+ await expect(page.locator('.supplier-card').first()).toBeVisible();
 });

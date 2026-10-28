@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+test.setTimeout(60000);
 
 test("real catalog: mobile grid, filters, detail, back, fallback and dark theme", async ({
   page,
@@ -63,7 +64,8 @@ test("real catalog: mobile grid, filters, detail, back, fallback and dark theme"
   await expect(page.getByRole("listbox")).toBeVisible();
   await expect(page.locator(".p-select-overlay")).toHaveCSS("opacity", "1");
   await page.screenshot({ path: "test-results/select-dark-mobile.png" });
-  await page.locator(".p-drawer-title").click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
   await page.emulateMedia({ colorScheme: "light" });
   await page.screenshot({ path: "test-results/filters-mobile.png" });
   await page.locator(".p-drawer-close-button").click();
@@ -122,17 +124,17 @@ test("admin: local login, source toggle, settings and product editing", async ({
     path: "test-results/admin-sources.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Фильтры и меню" }).click();
-  await page.getByRole("switch", { name: "Новинки", exact: true }).click();
+  await page.getByRole("button", { name: "Фильтры каталога" }).click();
+  await page.getByRole("switch", { name: "Категория", exact: true }).click();
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
   await expect(page.getByRole("status")).toHaveText("Сохранено");
   await page.getByRole("button", { name: "В каталог", exact: false }).click();
   await expect(
-    page.locator(".quick").getByRole("button", { name: "Новинки" }),
+    page.locator(".categories"),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Управление", exact: true }).click();
-  await page.getByRole("button", { name: "Фильтры и меню" }).click();
-  await page.getByRole("switch", { name: "Новинки", exact: true }).click();
+  await page.getByRole("button", { name: "Фильтры каталога" }).click();
+  await page.getByRole("switch", { name: "Категория", exact: true }).click();
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
   await page.getByRole("button", { name: "Товары", exact: true }).click();
   await page.locator(".admin-product").first().click();

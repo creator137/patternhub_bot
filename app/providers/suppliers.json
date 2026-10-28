@@ -1,0 +1,915 @@
+[
+  {
+    "source": "vikisews",
+    "display_name": "VikiSews",
+    "base_url": "https://vikisews.com",
+    "catalog_url": "https://vikisews.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "existing"
+  },
+  {
+    "source": "grasser",
+    "display_name": "Grasser",
+    "base_url": "https://grasser.ru",
+    "catalog_url": "https://grasser.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "existing"
+  },
+  {
+    "source": "helpersew",
+    "display_name": "HelperSew",
+    "base_url": "https://helpersew.com",
+    "catalog_url": "https://helpersew.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "existing"
+  },
+  {
+    "source": "elina_patykova",
+    "display_name": "Элина Патыкова",
+    "base_url": "https://elina-patykova.ru",
+    "catalog_url": "https://elina-patykova.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "mamashilamalishu",
+    "display_name": "мама шила малышу",
+    "base_url": "https://mamashilamalishu.ru",
+    "catalog_url": "https://mamashilamalishu.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "shapeinspace",
+    "display_name": "shape in space",
+    "base_url": "https://shapeinspace.ru",
+    "catalog_url": "https://shapeinspace.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "laforme",
+    "display_name": "LaForme",
+    "base_url": "https://laforme.ru",
+    "catalog_url": "https://laforme.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "elenapatternstudio",
+    "display_name": "Elenapatternstudio",
+    "base_url": "https://elenapatternstudio.ru",
+    "catalog_url": "https://elenapatternstudio.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "studio_yusupova",
+    "display_name": "Studio Yusupova",
+    "base_url": "https://studio-yusupova.ru",
+    "catalog_url": "https://studio-yusupova.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "existing"
+  },
+  {
+    "source": "sewitnow",
+    "display_name": "SewItNow",
+    "base_url": "https://sewitnow.ru",
+    "catalog_url": "https://sewitnow.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "existing"
+  },
+  {
+    "source": "patterneasy",
+    "display_name": "Выкройки легко",
+    "base_url": "https://patterneasy.com",
+    "catalog_url": "https://patterneasy.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "elena_plenkina",
+    "display_name": "Елена Пленкина",
+    "base_url": "https://elena-plenkina.ru",
+    "catalog_url": "https://elena-plenkina.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "candidate_adapter": "woo_store",
+    "note": "Полный Store API нестабилен: ReadTimeout. До подтверждения полного импорта — только ссылка."
+  },
+  {
+    "source": "your_tailor",
+    "display_name": "Your Tailor",
+    "base_url": "https://your-tailor.ru",
+    "catalog_url": "https://your-tailor.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "lekamarket",
+    "display_name": "Лекамаркет",
+    "base_url": "https://lekamarket.ru",
+    "catalog_url": "https://lekamarket.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "yousewdress",
+    "display_name": "You Sew Dress",
+    "base_url": "https://yousewdress.ru",
+    "catalog_url": "https://yousewdress.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "tvorilkamom",
+    "display_name": "Творилка",
+    "base_url": "https://tvorilkamom.ru",
+    "catalog_url": "https://tvorilkamom.ru/shop/",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_html"
+  },
+  {
+    "source": "burdastyle",
+    "display_name": "Бурда",
+    "base_url": "https://burdastyle.ru",
+    "catalog_url": "https://burdastyle.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "lokopatterns",
+    "display_name": "Loko pattern",
+    "base_url": "https://lokopatterns.ru",
+    "catalog_url": "https://lokopatterns.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "shkatulka_sew",
+    "display_name": "шкатулка выкройки",
+    "base_url": "https://shkatulka-sew.ru",
+    "catalog_url": "https://shkatulka-sew.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "ansews",
+    "display_name": "Ansews",
+    "base_url": "https://ansews.ru",
+    "catalog_url": "https://ansews.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "vselekala",
+    "display_name": "Все лекала",
+    "base_url": "https://vselekala.com",
+    "catalog_url": "https://vselekala.com/shop/",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_html"
+  },
+  {
+    "source": "pa2tern",
+    "display_name": "PA2TERN",
+    "base_url": "https://pa2tern.com",
+    "catalog_url": "https://pa2tern.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "patternclo",
+    "display_name": "ПатернКло",
+    "base_url": "https://patternclo.ru",
+    "catalog_url": "https://patternclo.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "helenpatterns",
+    "display_name": "One Pattern",
+    "base_url": "https://helenpatterns.ru",
+    "catalog_url": "https://helenpatterns.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+  },
+  {
+    "source": "lebovi",
+    "display_name": "Lebovi выкройки",
+    "base_url": "https://lebovi.by",
+    "catalog_url": "https://lebovi.by",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "easysew",
+    "display_name": "Easy sews",
+    "base_url": "https://easysew.info",
+    "catalog_url": "https://easysew.info",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "dress_layout",
+    "display_name": "Dress you",
+    "base_url": "https://dress-layout.ru",
+    "catalog_url": "https://dress-layout.ru/sale",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "lspatterns",
+    "display_name": "lspatterns.ru",
+    "base_url": "https://lspatterns.ru",
+    "catalog_url": "https://lspatterns.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "wanttosew",
+    "display_name": "Хочу шить",
+    "base_url": "https://wanttosew.ru",
+    "catalog_url": "https://wanttosew.ru/vykrojki/",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "sew_light",
+    "display_name": "sew-light.com",
+    "base_url": "https://sew-light.com",
+    "catalog_url": "https://sew-light.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "sewfreedom",
+    "display_name": "SewFreedom",
+    "base_url": "https://sewfreedom.ru",
+    "catalog_url": "https://sewfreedom.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "tailorgirl",
+    "display_name": "Рыбчинская",
+    "base_url": "https://tailorgirl.net",
+    "catalog_url": "https://tailorgirl.net",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "candidate_adapter": "tilda_sitemap",
+    "note": "Один из публичных product URL перенаправляет на другой origin; полный snapshot не подтверждён."
+  },
+  {
+    "source": "sewlevel",
+    "display_name": "SewLevel",
+    "base_url": "https://sewlevel.ru",
+    "catalog_url": "https://sewlevel.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "latelye",
+    "display_name": "Латели",
+    "base_url": "https://latelye.ru",
+    "catalog_url": "https://latelye.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "onesews",
+    "display_name": "onesews.com",
+    "base_url": "https://onesews.com",
+    "catalog_url": "https://onesews.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "bragar",
+    "display_name": "Диана Брагар",
+    "base_url": "https://bragar.shop",
+    "catalog_url": "https://bragar.shop",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "yasew",
+    "display_name": "Я шью",
+    "base_url": "https://yasew.ru",
+    "catalog_url": "https://yasew.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "skroila",
+    "display_name": "Скроила",
+    "base_url": "https://www.skroila.ru",
+    "catalog_url": "https://www.skroila.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "kaminskaya_sews",
+    "display_name": "Каминская",
+    "base_url": "https://kaminskaya-sews.ru",
+    "catalog_url": "https://kaminskaya-sews.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "selftailor",
+    "display_name": "SELFTAILOR",
+    "base_url": "https://selftailor.ru",
+    "catalog_url": "https://selftailor.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+  },
+  {
+    "source": "sewniverse",
+    "display_name": "Шьюниверс",
+    "base_url": "https://sewniverse.ru",
+    "catalog_url": "https://sewniverse.ru/shop",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_html"
+  },
+  {
+    "source": "katie_patterns",
+    "display_name": "Кейт pattern",
+    "base_url": "https://katie-patterns.ru",
+    "catalog_url": "https://katie-patterns.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+  },
+  {
+    "source": "whitewaterdress",
+    "display_name": "Whitewater",
+    "base_url": "https://whitewaterdress.ru",
+    "catalog_url": "https://whitewaterdress.ru/catalog",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "mintmoon",
+    "display_name": "Mint mom",
+    "base_url": "https://mintmoon.ru",
+    "catalog_url": "https://mintmoon.ru/",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "vikroyki_katya_mkhitaryan",
+    "display_name": "Катя Мхитарян",
+    "base_url": "https://vikroyki-katya-mkhitaryan.ru",
+    "catalog_url": "https://vikroyki-katya-mkhitaryan.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "wantandsew",
+    "display_name": "Хочу и шью",
+    "base_url": "https://wantandsew.online",
+    "catalog_url": "https://wantandsew.online",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "kapsulestore",
+    "display_name": "kapsulestore",
+    "base_url": "https://kapsulestore.ru",
+    "catalog_url": "https://kapsulestore.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "leko_mail",
+    "display_name": "leko mail",
+    "base_url": "https://leko-mail.ru",
+    "catalog_url": "https://leko-mail.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "sew_lane",
+    "display_name": "sew-line",
+    "base_url": "https://sew-lane.ru",
+    "catalog_url": "https://sew-lane.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "vikroy_ka",
+    "display_name": "vikroy-ka.ru",
+    "base_url": "https://vikroy-ka.ru",
+    "catalog_url": "https://vikroy-ka.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "mialine",
+    "display_name": "mialine",
+    "base_url": "https://mialine.ru",
+    "catalog_url": "https://mialine.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "wmtailorschool",
+    "display_name": "Дмитрий Зорин",
+    "base_url": "https://wmtailorschool.ru",
+    "catalog_url": "https://wmtailorschool.ru/product-category/vykrojki/",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_html"
+  },
+  {
+    "source": "ivahm_patterns",
+    "display_name": "ivahm-patterns",
+    "base_url": "https://ivahm-patterns.ru",
+    "catalog_url": "https://ivahm-patterns.ru/shop",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "oldem_sew",
+    "display_name": "oldem-sew.ru",
+    "base_url": "https://oldem-sew.ru",
+    "catalog_url": "https://oldem-sew.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "tifinapatterns",
+    "display_name": "tifinapatterns",
+    "base_url": "https://tifinapatterns.ru",
+    "catalog_url": "https://tifinapatterns.ru/shop/all",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "belenochka",
+    "display_name": "belenochka",
+    "base_url": "https://belenochka.ru",
+    "catalog_url": "https://belenochka.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "lubimchiki_style",
+    "display_name": "lubimchiki-style.ru",
+    "base_url": "https://lubimchiki-style.ru",
+    "catalog_url": "https://lubimchiki-style.ru/patterns",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "baysews",
+    "display_name": "baysews",
+    "base_url": "https://baysews.ru",
+    "catalog_url": "https://baysews.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "seweeasy",
+    "display_name": "соу изи",
+    "base_url": "https://seweeasy.com",
+    "catalog_url": "https://seweeasy.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "masterskayakorol",
+    "display_name": "masterskayakorol.ru",
+    "base_url": "https://masterskayakorol.ru",
+    "catalog_url": "https://masterskayakorol.ru/catalog",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "andrianova_pattern",
+    "display_name": "Andrianova pattern",
+    "base_url": "https://andrianova-pattern.ru",
+    "catalog_url": "https://andrianova-pattern.ru",
+    "specialization": "general",
+    "enabled": false,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "Домен переиспользован: текущее содержимое не относится к выкройкам."
+  },
+  {
+    "source": "settembre",
+    "display_name": "settembre.ru",
+    "base_url": "https://settembre.ru",
+    "catalog_url": "https://settembre.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "aurorasew",
+    "display_name": "aurorasew.ru",
+    "base_url": "https://aurorasew.ru",
+    "catalog_url": "https://aurorasew.ru/shop",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "neovima",
+    "display_name": "neovima.com",
+    "base_url": "https://neovima.com",
+    "catalog_url": "https://neovima.com/patterns/",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_html"
+  },
+  {
+    "source": "vikroim",
+    "display_name": "выкроим",
+    "base_url": "https://vikroim.ru",
+    "catalog_url": "https://vikroim.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "unikroj",
+    "display_name": "unikroj.ru",
+    "base_url": "https://unikroj.ru",
+    "catalog_url": "https://unikroj.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "angela_molodets",
+    "display_name": "angela-molodets.ru",
+    "base_url": "https://angela-molodets.ru",
+    "catalog_url": "https://angela-molodets.ru/shop",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "starkova_art",
+    "display_name": "starkova-art.ru",
+    "base_url": "https://starkova-art.ru",
+    "catalog_url": "https://starkova-art.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "morozovamarie",
+    "display_name": "morozovamarie.ru",
+    "base_url": "https://morozovamarie.ru",
+    "catalog_url": "https://morozovamarie.ru/shop/vse",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "shveyaholic",
+    "display_name": "shveyaholic.ru",
+    "base_url": "https://shveyaholic.ru",
+    "catalog_url": "https://shveyaholic.ru/catalog",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "sew_garmentfactory",
+    "display_name": "sew-garmentfactory.ru",
+    "base_url": "https://sew-garmentfactory.ru",
+    "catalog_url": "https://sew-garmentfactory.ru",
+    "specialization": "general",
+    "enabled": false,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "Домен переиспользован: текущее содержимое не относится к выкройкам."
+  },
+  {
+    "source": "modeliruishey",
+    "display_name": "моделирую и шью",
+    "base_url": "https://modeliruishey.ru",
+    "catalog_url": "https://modeliruishey.ru/shop",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "tashamorozova",
+    "display_name": "tashamorozova",
+    "base_url": "https://tashamorozova.ru",
+    "catalog_url": "https://tashamorozova.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "all_sew",
+    "display_name": "all-sew",
+    "base_url": "https://all-sew.ru",
+    "catalog_url": "https://all-sew.ru/shop/all",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "fancysmth",
+    "display_name": "fancysmth",
+    "base_url": "https://fancysmth.com",
+    "catalog_url": "https://fancysmth.com",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "lirapattern",
+    "display_name": "lirapattern.ru",
+    "base_url": "https://lirapattern.ru",
+    "catalog_url": "https://lirapattern.ru",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "marymake",
+    "display_name": "Marymake",
+    "base_url": "https://marymake.ru",
+    "catalog_url": "https://marymake.ru/vykrojki",
+    "specialization": "general",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+  },
+  {
+    "source": "laviedelalingerie_shop",
+    "display_name": "laviedelalingerie",
+    "base_url": "https://laviedelalingerie-shop.com",
+    "catalog_url": "https://laviedelalingerie-shop.com",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "woo_store"
+  },
+  {
+    "source": "womanew",
+    "display_name": "WomaNew",
+    "base_url": "https://womanew.ru",
+    "catalog_url": "https://womanew.ru",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "shvej_shop",
+    "display_name": "shvej-shop",
+    "base_url": "https://shvej-shop.by",
+    "catalog_url": "https://shvej-shop.by/shop/",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "candidate_adapter": "woo_html",
+    "note": "robots.txt запрещает следующую страницу каталога. Полный snapshot не подтверждён."
+  },
+  {
+    "source": "alenakochkareva",
+    "display_name": "alena kochkareva",
+    "base_url": "https://alenakochkareva.ru",
+    "catalog_url": "https://alenakochkareva.ru",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "tilda_sitemap"
+  },
+  {
+    "source": "juliastefanello",
+    "display_name": "juliastefanello",
+    "base_url": "https://juliastefanello.com",
+    "catalog_url": "https://juliastefanello.com",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null,
+    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+  },
+  {
+    "source": "perchikpatterns",
+    "display_name": "Perchik Patterns",
+    "base_url": "https://perchikpatterns.ru",
+    "catalog_url": "https://perchikpatterns.ru/shop",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "lekalolingerie",
+    "display_name": "ЛекалоЛинджери",
+    "base_url": "https://lekalolingerie.com",
+    "catalog_url": "https://lekalolingerie.com",
+    "specialization": "lingerie",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "modety",
+    "display_name": "Modety",
+    "base_url": "https://modety.ru",
+    "catalog_url": "https://modety.ru",
+    "specialization": "kids",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "zheltokbaby",
+    "display_name": "Желток",
+    "base_url": "https://zheltokbaby.com",
+    "catalog_url": "https://zheltokbaby.com",
+    "specialization": "kids",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "lekalo_kids",
+    "display_name": "lekalo-kids",
+    "base_url": "https://lekalo-kids.ru",
+    "catalog_url": "https://lekalo-kids.ru/shop",
+    "specialization": "kids",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  },
+  {
+    "source": "aspatterns",
+    "display_name": "aspatterns",
+    "base_url": "https://aspatterns.ru",
+    "catalog_url": "https://aspatterns.ru",
+    "specialization": "kids",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "lekalo",
+    "display_name": "Лекало онлайн",
+    "base_url": "https://lekalo.online",
+    "catalog_url": "https://lekalo.online/detskaya-odezhda/",
+    "specialization": "kids",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": null
+  },
+  {
+    "source": "kids_patterns",
+    "display_name": "Kids Patterns",
+    "base_url": "https://kids-patterns.ru",
+    "catalog_url": "https://kids-patterns.ru/shop",
+    "specialization": "kids",
+    "enabled": true,
+    "verified_on": "2026-10-28",
+    "adapter": "vigbo"
+  }
+]

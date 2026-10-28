@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+from urllib.parse import urlsplit
 from contextlib import asynccontextmanager
 import asyncio
 
@@ -15,7 +16,7 @@ from app.config import load_settings
 from app.database import Database
 from app.models.categories import CATEGORIES
 from app.web.auth import WebSettings, require_admin, require_user
-from app.web.catalog import FILTERS, MENUS, WebCatalogRepository, WebCatalogService, safe_url
+from app.web.catalog import FILTERS, MENUS, COMMON_FILTERS, WebCatalogRepository, WebCatalogService, safe_url
 from app.services.images import ImageCache, ImageUnavailable, image_key
 from app.repositories.media import MediaRepository
 
@@ -47,6 +48,7 @@ class FavoriteInput(BaseModel):
 class SourceInput(BaseModel):
     display_name: str = Field(min_length=1, max_length=100)
     base_url: HttpUrl
+    specialization: Literal['general','lingerie','kids','bags','pets'] = 'general'
 
 
 class UIItem(BaseModel):
@@ -151,9 +153,15 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     @app.get("/api/meta")
     def meta():
         facets = repo.page({"limit": 1})
-        return {"ui": repo.settings(), "coverage": repo.coverage(), "categories": facets["categories"], "brands": facets["brands"],
+        return {"ui": repo.public_settings(), "common_filters": COMMON_FILTERS,
+                "supplier_count": len(repo.public_suppliers()),
+                "coverage": repo.coverage(), "categories": facets["categories"], "brands": facets["brands"],
                 "category_options": [c.name for c in CATEGORIES],
                 "local_login": app.state.web_settings.environment == "local" and bool(app.state.web_settings.dev_key)}
+
+    @app.get('/api/suppliers')
+    async def public_suppliers():
+        return await asyncio.to_thread(repo.public_suppliers)
 
     @app.get("/api/admin/session", dependencies=[Depends(require_admin)])
     def session():
@@ -198,8 +206,11 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
         if not url:
             raise HTTPException(422, "HTTP(S) URL without credentials required")
         with database.connect() as db:
-            db.execute("INSERT INTO sources(name,display_name,base_url,enabled) VALUES(?,?,?,0)",
-                       ("site_" + uuid4().hex[:16], value.display_name.strip(), url))
+            host = urlsplit(url).hostname.removeprefix('www.')
+            if any(urlsplit(row[0]).hostname.removeprefix('www.') == host for row in db.execute('SELECT base_url FROM sources')):
+                raise HTTPException(409,'Этот сайт уже добавлен')
+            db.execute("INSERT INTO sources(name,display_name,base_url,enabled,catalog_url,specialization) VALUES(?,?,?,0,?,?)",
+                       ("site_" + uuid4().hex[:16], value.display_name.strip(), url, url, value.specialization))
         return {"ok": True}
 
     @app.patch("/api/admin/sources/{source}", dependencies=[Depends(require_admin)])

@@ -99,7 +99,7 @@ class CatalogPolicyTests(unittest.TestCase):
         self.repo.upsert_many([self.p])
         product = self.repo.list_products()[0]
         self.repo.set_filter_metadata(product.id,
-            {'source_published_at': datetime.now(timezone.utc)}, expected_url=product.product_url)
+            {'source_published_at': datetime.now(timezone.utc)-timedelta(seconds=1)}, expected_url=product.product_url)
         with self.db.connect() as db:
             row = db.execute('SELECT filters_checked_at,is_new FROM products WHERE id=?',
                              (product.id,)).fetchone()

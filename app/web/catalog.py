@@ -12,6 +12,7 @@ from app.models.catalog_policy import free_section_sql, new_section_sql, NEW_WIN
 
 FILTERS = ("search", "category", "source", "audience", "is_new", "is_sale", "is_free", "is_beginner", "is_knit", "sort")
 MENUS = ("women", "men", "kids", "unisex")
+COMMON_FILTERS = ('search', 'category', 'source')
 SORTS = {"name": "p.name, p.id", "price_asc": "p.price IS NULL, CAST(p.price AS REAL), p.id",
          "new_first": ("p.source_recency_rank IS NULL, p.source_recency_rank, "
                        f"{new_section_sql('p.')} DESC, "
@@ -60,6 +61,27 @@ class WebCatalogRepository(ProductRepository):
         with self.database.connect() as db:
             db.execute("INSERT INTO settings(key,value) VALUES('miniapp.ui',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP", (json.dumps(value),))
 
+    def public_settings(self):
+        # Preserve imported facts and internal API capabilities, while exposing
+        # only controls supported across the expanded supplier list.
+        value = json.loads(json.dumps(self.settings()))
+        for entry in value['filters']:
+            entry['enabled'] = bool(entry['enabled'] and entry['key'] in COMMON_FILTERS)
+        for entry in value['menu']:
+            entry['enabled'] = False
+        return value
+
+    def public_suppliers(self):
+        with self.database.connect() as db:
+            rows = db.execute('''SELECT s.name AS source,s.display_name AS name,
+                s.base_url,COALESCE(s.catalog_url,s.base_url) AS url,s.specialization,
+                COUNT(CASE WHEN p.is_available=1 AND COALESCE(o.hidden,0)=0 THEN 1 END) AS products
+                FROM sources s LEFT JOIN products p ON p.source=s.name
+                LEFT JOIN product_overrides o ON o.product_id=p.id
+                WHERE s.enabled=1 GROUP BY s.name ORDER BY casefold(s.display_name),s.name''').fetchall()
+        return [dict(row) | {'url':safe_url(row['url']), 'base_url':safe_url(row['base_url'])}
+                for row in rows if safe_url(row['url'])]
+
     def page(self, query, *, admin=False):
         clauses, values = [], []
         if not admin:
@@ -89,7 +111,7 @@ class WebCatalogRepository(ProductRepository):
             total = db.execute(f"SELECT COUNT(*) {base} WHERE {where}", values).fetchone()[0]
             rows = db.execute(f"SELECT p.*, COALESCE(o.category,p.category) AS effective_category, COALESCE(o.hidden,0) AS hidden, s.enabled AS source_enabled {base} WHERE {where} ORDER BY {order} LIMIT ? OFFSET ?", (*values, query.get("limit", 24), query.get("offset", 0))).fetchall()
             categories = [dict(r) for r in db.execute(f"SELECT COALESCE(o.category,p.category) AS name, COUNT(*) AS count {base} WHERE {where} GROUP BY 1 HAVING COALESCE(o.category,p.category) IS NOT NULL ORDER BY 1", values)]
-            brands = [dict(r) for r in db.execute(f"SELECT s.name AS source, s.display_name AS name, COUNT(*) AS count {base} WHERE {where} GROUP BY s.name ORDER BY s.display_name", values)]
+            brands = [dict(r) for r in db.execute(f"SELECT s.name AS source, s.display_name AS name, COUNT(*) AS count {base} WHERE {where} GROUP BY s.name ORDER BY casefold(s.display_name),s.name", values)]
         items = []
         for row in rows:
             item = asdict(self._to_product(row))

@@ -98,7 +98,11 @@ def create_main_keyboard(
     ]
     rows.append([KeyboardButton(text=HOME_TEXT)])
     if miniapp_url:
-        rows.insert(0, [KeyboardButton(text="Открыть каталог", web_app=WebAppInfo(url=miniapp_url))])
+        rows = [
+            [KeyboardButton(text="Открыть каталог", web_app=WebAppInfo(url=miniapp_url))],
+            [KeyboardButton(text="Поставщики", web_app=WebAppInfo(url=miniapp_url.split('#',1)[0]+'#/suppliers'))],
+            [KeyboardButton(text=HOME_TEXT)],
+        ]
     return ReplyKeyboardMarkup(
         keyboard=[row for row in rows if row],
         resize_keyboard=True,

@@ -16,6 +16,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 from PIL import Image, ImageOps
 from app.repositories.media import MediaRepository
+from app.suppliers import supplier_definitions
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,13 @@ MEDIA_HOSTS = frozenset({
     "vikisews.com", "storage.yandexcloud.net", "grasser.ru", "helpersew.com",
     "studio-yusupova.ru", "sewitnow.ru", "api.sewitnow.ru",
     "sellty-assets-prod.storage.yandexcloud.net", "static.tildacdn.com", "static.tildacdn.net",
-}) | frozenset(host.strip().lower() for host in os.getenv('MEDIA_ALLOWED_HOSTS', '').split(',') if host.strip())
+    "cdn-sh1.vigbo.com", "thb.tildacdn.com",
+}) | frozenset(
+    host
+    for supplier in supplier_definitions() if supplier['enabled'] and supplier.get('adapter')
+    for host in (urlsplit(supplier['base_url']).hostname,
+                 'www.' + urlsplit(supplier['base_url']).hostname.removeprefix('www.'))
+) | frozenset(host.strip().lower() for host in os.getenv('MEDIA_ALLOWED_HOSTS', '').split(',') if host.strip())
 MAX_BYTES = 12 * 1024 * 1024
 MAX_PIXELS = 25_000_000
 
