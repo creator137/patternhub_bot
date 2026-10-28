@@ -50,6 +50,9 @@ async def prepare(*, mode='covers', source=None, product_id=None, limit=10000):
                                 await asyncio.sleep(max(pause, 2 ** attempt * random.uniform(.8,1.2)))
                         provider = create_provider(product.source)
                         facts = provider.parse_filter_metadata(response.text, product.product_url)
+                        published = provider.parse_publication_date(response.text, product.product_url)
+                        if published:
+                            facts['source_published_at'] = published
                         await asyncio.to_thread(repo.set_filter_metadata, product.id, facts, expected_url=product.product_url)
                         if mode == 'filters':
                             stats['galleries'] += 1

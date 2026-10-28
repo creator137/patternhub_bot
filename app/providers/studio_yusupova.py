@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import replace
 
 import asyncio
 import html
@@ -115,11 +116,39 @@ class StudioYusupovaProvider(BaseProvider):
             else:
                 complete = errors == 0
 
+            # WordPress public product posts expose publication time; Store API
+            # does not. Never substitute modified/lastmod/import time.
+            dates = await self.fetch_publication_dates(client)
+            for key, product in products_by_key.items():
+                if product.source_product_id in dates:
+                    products_by_key[key] = replace(product, source_published_at=dates[product.source_product_id]).normalized()
+
         return ProviderResult(
             list(products_by_key.values()),
             errors=errors,
             complete=complete,
         )
+
+    async def fetch_publication_dates(self, client):
+        from app.models.catalog_policy import publication_datetime
+        dates = {}
+        for page in range(1, self.max_pages + 1):
+            url = f'{self.base_url}/wp-json/wp/v2/product?per_page=100&page={page}&_fields=id,date_gmt'
+            payload, headers = await self._get_json(client, url)
+            if not isinstance(payload, list):
+                logger.warning('Product publication dates unavailable: %s', url)
+                break
+            for item in payload:
+                if not isinstance(item, dict) or not str(item.get('id') or '').isdigit():
+                    logger.warning('Invalid publication metadata row on page %s', page)
+                    continue
+                date = publication_datetime(str(item.get('date_gmt') or '') + 'Z')
+                if date:
+                    dates[str(item['id'])] = date
+            if page >= (self._total_pages(headers) or 1):
+                break
+        logger.info('Studio Yusupova verified publication dates: %s', len(dates))
+        return dates
 
     def _products_page_url(self, page: int) -> str:
         return f"{self.products_url}?per_page={self.per_page}&page={page}"

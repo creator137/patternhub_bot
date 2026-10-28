@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 from fastapi.testclient import TestClient
@@ -35,7 +36,7 @@ class WebTests(unittest.TestCase):
         self.db = Database(Path(self.temp.name) / "test.sqlite3")
         self.db.initialize()
         self.repo = ProductRepository(self.db)
-        self.p = ParsedProduct(source="vikisews", source_product_id="1", name="Платье Лето", product_url="https://example.com/a", category="Платья", audience="women", is_new=True)
+        self.p = ParsedProduct(source="vikisews", source_product_id="1", name="Платье Лето", product_url="https://example.com/a", category="Платья", audience="women", is_new=True, source_published_at=datetime.now(timezone.utc)-timedelta(days=1))
         self.repo.upsert_many([self.p, ParsedProduct(source="grasser", source_product_id="2", name="Жакет", product_url="https://example.com/b", category="Жакеты", audience="men")])
         self.client = TestClient(create_app(self.db, WebSettings("test-token", frozenset({42}))))
         self.auth = {"X-Telegram-Init-Data": signed()}

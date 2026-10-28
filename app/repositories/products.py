@@ -20,6 +20,7 @@ from app.models.product import (
     Product,
     ProductFilter,
 )
+from app.models.catalog_policy import free_section_sql, new_section_sql, is_recent_publication, publication_datetime
 
 
 class ProductRepository:
@@ -38,7 +39,7 @@ class ProductRepository:
                 existing_id = self._find_existing_id(connection, product)
                 values = self._values(product)
                 if existing_id is not None:
-                    for field in ('is_beginner', 'is_knit', 'sizes', 'heights', 'difficulty', 'description'):
+                    for field in ('is_beginner', 'is_knit', 'sizes', 'heights', 'difficulty', 'description', 'source_published_at'):
                         if getattr(product, field) is None:
                             values.pop(field, None)
                     for field in ('is_beginner', 'is_knit', 'is_new'):
@@ -62,6 +63,7 @@ class ProductRepository:
                         (*values.values(), existing_id),
                     )
                     updated += 1
+            connection.execute(f'UPDATE products SET is_new={new_section_sql()} WHERE is_new!={new_section_sql()}')
         return added, updated
 
     def list_categories(self, filters: ProductFilter | None = None) -> list[CatalogCategory]:
@@ -187,11 +189,16 @@ class ProductRepository:
                 (product_id, attempts, deadline, error[:100]))
 
     def set_filter_metadata(self, product_id: int, facts: dict, *, expected_url: str):
-        allowed = {'is_beginner', 'is_knit', 'difficulty', 'description'}
+        allowed = {'is_beginner', 'is_knit', 'difficulty', 'description', 'source_published_at'}
         if set(facts) - allowed:
             raise ValueError('Unsupported detail fact')
         values = {key: int(value) if key.startswith('is_') else value
                   for key, value in facts.items() if value is not None}
+        if 'source_published_at' in values:
+            published = publication_datetime(values['source_published_at'])
+            if published is None:
+                raise ValueError('Invalid source publication date')
+            values['source_published_at'] = published.isoformat()
         with self.database.connect() as db:
             # A current, complete source section outranks absence of a tag on a
             # detail page. Positive detail evidence can still extend coverage.
@@ -200,12 +207,18 @@ class ProductRepository:
                 AND f.checked_at>=datetime('now','-1 day')''', (product_id,))}
             values = {key:value for key,value in values.items() if key not in authoritative or value != 0}
             assignments = [f'{key}=?' for key in values]
-            assignments.append('filters_checked_at=CURRENT_TIMESTAMP')
+            # A bulk date lookup is not a detail-page filter audit.
+            if set(facts) != {'source_published_at'}:
+                assignments.append('filters_checked_at=CURRENT_TIMESTAMP')
+            if not assignments:
+                return
             db.execute(f"UPDATE products SET {','.join(assignments)} WHERE id=? AND product_url=?",
                        (*values.values(), product_id, expected_url))
+            if 'source_published_at' in values:
+                db.execute(f'UPDATE products SET is_new={new_section_sql()} WHERE id=?', (product_id,))
 
     def apply_filter_snapshot(self, source: str, field: str, snapshot) -> int:
-        if field not in {'is_beginner','is_knit','is_new'}:
+        if field not in {'is_beginner','is_knit'}:
             raise ValueError('Unsupported membership filter')
         if not snapshot.products:
             return 0  # Empty/blocked pages must never clear existing facts.
@@ -289,10 +302,10 @@ class ProductRepository:
                 """
             ).fetchone()
             totals = connection.execute(
-                """
+                f"""
                 SELECT COUNT(*) AS products,
                        COALESCE(SUM(is_sale), 0) AS on_sale,
-                       COALESCE(SUM(is_new), 0) AS new,
+                       COALESCE(SUM({new_section_sql()}), 0) AS new,
                        COALESCE(SUM(is_free), 0) AS free,
                        COALESCE(SUM(is_beginner), 0) AS beginner,
                        COALESCE(SUM(is_knit), 0) AS knit,
@@ -351,6 +364,13 @@ class ProductRepository:
             no_image=totals["no_image"],
             by_audience=by_audience,
         )
+
+    def publication_stats(self):
+        with self.database.connect() as db:
+            return [dict(r) for r in db.execute(f'''SELECT source,COUNT(*) AS products,
+                SUM(source_published_at IS NOT NULL) AS dated,
+                SUM({new_section_sql()}) AS recent FROM products
+                WHERE is_available=1 GROUP BY source ORDER BY source''')]
 
     def mark_unavailable_missing(
         self, source: str, products: Iterable[ParsedProduct]
@@ -455,10 +475,10 @@ class ProductRepository:
                 clauses.append("is_sale = ?")
                 parameters.append(int(filters.is_sale))
             if filters.is_free is not None:
-                clauses.append("is_free = ?")
+                clauses.append(f"{free_section_sql()} = ?")
                 parameters.append(int(filters.is_free))
             if filters.is_new is not None:
-                clauses.append("is_new = ?")
+                clauses.append(f"{new_section_sql()} = ?")
                 parameters.append(int(filters.is_new))
             if filters.is_beginner is not None:
                 clauses.append("is_beginner = ?")
@@ -513,6 +533,7 @@ class ProductRepository:
             "is_sale": int(product.is_sale),
             "is_free": int(product.is_free),
             "is_new": int(product.is_new),
+            "source_new_badge": int(bool(product.source_new_badge)),
             "is_beginner": int(bool(product.is_beginner)),
             "is_knit": int(bool(product.is_knit)),
             "sizes": json.dumps(product.sizes, ensure_ascii=False) if product.sizes else None,
@@ -527,6 +548,7 @@ class ProductRepository:
                 if product.source_updated_at is not None
                 else None
             ),
+            "source_published_at": product.source_published_at.isoformat() if product.source_published_at else None,
         }
 
     @staticmethod
@@ -547,7 +569,9 @@ class ProductRepository:
             currency=row["currency"],
             is_sale=bool(row["is_sale"]),
             is_free=bool(row["is_free"]),
-            is_new=bool(row["is_new"]),
+            is_new=is_recent_publication(row['source_published_at']),
+            source_new_badge=bool(row['source_new_badge']),
+            source_published_at=publication_datetime(row['source_published_at']),
             is_beginner=bool(row["is_beginner"]),
             is_knit=bool(row["is_knit"]),
             sizes=tuple(json.loads(row["sizes"])) if row["sizes"] else None,

@@ -320,10 +320,11 @@ class HelperSewProvider(BaseProvider):
             currency=base.currency or "RUB",
             is_sale=base.is_sale,
             is_free=base.is_free,
-            is_new=base.is_new or (
+            source_new_badge=base.source_new_badge or (
                 tags_text is not None
                 and "new" in tags_text.get_text(" ", strip=True).casefold()
             ),
+            source_published_at=base.source_published_at,
             sizes=sizes or base.sizes,
             heights=heights or base.heights,
             difficulty=(
@@ -377,7 +378,7 @@ class HelperSewProvider(BaseProvider):
             currency="RUB",
             is_sale="sale" in labels,
             is_free=price == Decimal("0.00"),
-            is_new="new" in labels,
+            source_new_badge="new" in labels,
             is_beginner=page_is_beginner,
             is_knit=page_is_knit,
             product_url=product_url,
@@ -400,7 +401,8 @@ class HelperSewProvider(BaseProvider):
             product,
             is_sale=existing.is_sale or product.is_sale,
             is_free=existing.is_free or product.is_free,
-            is_new=existing.is_new or product.is_new,
+            source_new_badge=existing.source_new_badge or product.source_new_badge,
+            source_published_at=product.source_published_at or existing.source_published_at,
             is_beginner=existing.is_beginner or product.is_beginner,
             is_knit=existing.is_knit or product.is_knit,
         ).normalized()

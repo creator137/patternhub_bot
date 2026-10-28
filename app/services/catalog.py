@@ -37,6 +37,16 @@ class CatalogService:
     def __init__(self, repository: ProductRepository) -> None:
         self.repository = repository
 
+    async def enrich_publications(self, provider: BaseProvider):
+        filters = ProductFilter(source=provider.source)
+        products = await self.get_products(limit=await self.count_products(filters),filters=filters)
+        updates = await provider.publication_updates(products)
+        for product in products:
+            if product.id in updates:
+                await asyncio.to_thread(self.repository.set_filter_metadata,product.id,
+                    {'source_published_at':updates[product.id]},expected_url=product.product_url)
+        return {'source':provider.source,'products':len(products),'dated':len(updates)}
+
     async def synchronize(self, provider: BaseProvider) -> SyncStats:
         started = monotonic()
         logger.info("Starting parser: %s", provider.source)

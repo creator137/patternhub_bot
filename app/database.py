@@ -81,6 +81,19 @@ class Database:
             self._ensure_column(connection, "products", "image_urls", "TEXT")
             self._ensure_column(connection, "products", "gallery_checked_at", "TEXT")
             self._ensure_column(connection, "products", "filters_checked_at", "TEXT")
+            self._ensure_column(connection, "products", "source_published_at", "TEXT")
+            connection.execute('SAVEPOINT publication_badges')
+            try:
+                if self._ensure_column(connection, 'products', 'source_new_badge', 'INTEGER NOT NULL DEFAULT 0'):
+                    connection.execute('UPDATE products SET source_new_badge=is_new')
+                    from app.models.catalog_policy import new_section_sql
+                    connection.execute(f'UPDATE products SET is_new={new_section_sql()}')
+                connection.execute('RELEASE publication_badges')
+            except Exception:
+                connection.execute('ROLLBACK TO publication_badges')
+                connection.execute('RELEASE publication_badges')
+                raise
+            connection.execute('CREATE INDEX IF NOT EXISTS idx_products_published ON products(source_published_at)')
             connection.execute('''CREATE TABLE IF NOT EXISTS source_filter_snapshots (
                 source TEXT NOT NULL REFERENCES sources(name), field TEXT NOT NULL,
                 checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -154,13 +167,15 @@ class Database:
     @staticmethod
     def _ensure_column(
         connection: sqlite3.Connection, table: str, column: str, definition: str
-    ) -> None:
+    ) -> bool:
         columns = {
             row["name"]
             for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
         }
         if column not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            return True
+        return False
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

@@ -102,7 +102,8 @@ def main() -> None:
         print(f"Test chat_id set to {args.chat_id}")
         return
     if args.command == "catalog-stats":
-        stats = product_repository().stats()
+        repository = product_repository()
+        stats = repository.stats()
         print(f"Products total: {stats.total}")
         print(f"Available: {stats.available}")
         print(f"Unavailable: {stats.unavailable}")
@@ -116,6 +117,11 @@ def main() -> None:
         print(f"\nOn sale: {stats.on_sale}")
         print(f"New: {stats.new}")
         print(f"Free: {stats.free}")
+        from app.models.product import ProductFilter
+        print(f"Free section (0 RUB / 1 RUB): {repository.count_products(ProductFilter(is_free=True))}")
+        print('Publication dates (dated / available; last 60 days):')
+        for row in repository.publication_stats():
+            print(f"  {row['source']}: {row['dated']} / {row['products']}; new: {row['recent']}")
         print(f"Beginner: {stats.beginner}")
         print(f"Knit: {stats.knit}")
         print(f"Categories: {stats.categories}")

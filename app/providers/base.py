@@ -25,8 +25,24 @@ class FilterSnapshot:
 class BaseProvider(ABC):
     source: str
 
+    def publication_key(self, product) -> str:
+        return str(product.source_product_id or '')
+
+    async def fetch_publication_dates(self, client) -> dict:
+        return {}
+
+    async def publication_updates(self, products) -> dict:
+        import httpx
+        async with httpx.AsyncClient(timeout=httpx.Timeout(40,connect=10),follow_redirects=True,trust_env=False) as client:
+            dates = await self.fetch_publication_dates(client)
+        return {p.id:dates[self.publication_key(p)] for p in products if self.publication_key(p) in dates}
+
     async def fetch_filter_snapshots(self) -> dict[str, FilterSnapshot]:
         return {}
+
+    def parse_publication_date(self, html: str, product_url: str):
+        from app.providers.publication import product_publication_date
+        return product_publication_date(html, product_url)
 
     def parse_filter_metadata(self, html: str, product_url: str) -> dict:
         """Only authoritative detail facts; omitted fields remain unchanged."""

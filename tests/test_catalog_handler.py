@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timezone, timedelta
 
 import asyncio
 import tempfile
@@ -65,6 +66,7 @@ def product(
         sizes=("38", "54"),
         heights=("162-168", "170-176"),
         is_new=is_new,
+        source_published_at=datetime.now(timezone.utc)-timedelta(days=1) if is_new else None,
         difficulty=difficulty,
         description=description,
         product_url=f"https://vikisews.com/vykrojki/{source_product_id}/",

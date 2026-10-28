@@ -4,10 +4,10 @@ import asyncio
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlencode, urlsplit
 
 import httpx
 from bs4 import BeautifulSoup
@@ -39,6 +39,7 @@ class SewItNowProvider(BaseProvider):
     source = "sewitnow"
     base_url = "https://sewitnow.ru"
     brand = "SewItNow"
+    api_url = 'https://api.sewitnow.ru/'
 
     _category_overrides = {
         "Блузы": "Рубашки, блузки и топы",
@@ -100,6 +101,7 @@ class SewItNowProvider(BaseProvider):
         self.incomplete_pages: list[str] = []
         self.total_pages = 0
         self.last_skipped = 0
+        self._seller_id = None
 
     async def fetch_products(self) -> ProviderResult:
         errors = 0
@@ -129,6 +131,8 @@ class SewItNowProvider(BaseProvider):
                 return ProviderResult([], errors=1, complete=False)
 
             build_id = str(home_data.get("buildId") or "")
+            props = (home_data.get('props') or {}).get('pageProps') or home_data.get('pageProps') or {}
+            self._seller_id = str((props.get('initSeller') or {}).get('id') or '') or None
             groups = self._groups(home_data)
             category_index = self.category_index(groups)
             pages = self.catalog_pages(groups)
@@ -184,6 +188,12 @@ class SewItNowProvider(BaseProvider):
                         page_skipped,
                     )
 
+            dates = await self.fetch_publication_dates(client)
+            for key, product in products_by_key.items():
+                published = dates.get(self.publication_key(product))
+                if published:
+                    products_by_key[key] = replace(product,source_published_at=published).normalized()
+
         complete = errors == 0 and not self.incomplete_pages and self.max_groups is None
         if self.incomplete_pages:
             logger.warning(
@@ -197,6 +207,47 @@ class SewItNowProvider(BaseProvider):
             skipped=skipped,
             complete=complete,
         )
+
+    def publication_key(self, product) -> str:
+        # Storefront parent IDs and public SKU IDs differ. Canonical URLs carry
+        # the public SKU; aliases retain that numeric suffix.
+        return urlsplit(product.product_url).path.rstrip('/').split('/')[-1].rsplit('-',1)[-1]
+
+    async def fetch_publication_dates(self, client) -> dict:
+        from app.models.catalog_policy import publication_datetime
+        dates = {}
+        async def query(text):
+            payload = await self._get_json(client,self.api_url+'?'+urlencode({'query':text}))
+            if not isinstance(payload,dict) or payload.get('errors') or not isinstance(payload.get('data'),dict):
+                logger.warning('SewItNow publication query unavailable')
+                return None
+            return payload.get('data') or {}
+        if not self._seller_id:
+            data = await query('query { identSeller(domain:'+json.dumps(urlsplit(self.base_url).hostname)+') { id } }')
+            self._seller_id = str(((data or {}).get('identSeller') or {}).get('id') or '')
+        if not str(self._seller_id).isdigit():
+            return dates
+        seen = set()
+        for page in range(1,51):
+            data = await query(f'query {{ getProducts(input:{{seller_id:"{self._seller_id}",paginate:{{limit:100,page:{page}}}}}) {{ page pages elements list {{ id created_at }} }} }}')
+            payload = (data or {}).get('getProducts') or {}
+            if payload.get('page') != page or not isinstance(payload.get('list'),list):
+                break
+            rows = payload['list']
+            keys = {str(row.get('id')) for row in rows if isinstance(row,dict) and row.get('id')}
+            if not keys or keys <= seen:
+                break
+            seen.update(keys)
+            for row in rows:
+                if not isinstance(row,dict) or not row.get('id'):
+                    continue
+                date = publication_datetime(row.get('created_at'))
+                if date:
+                    dates[str(row['id'])] = date
+            if page >= int(payload.get('pages') or page):
+                break
+        logger.info('SewItNow verified source-added dates: %s',len(dates))
+        return dates
 
     async def _get_text(self, client: httpx.AsyncClient, url: str) -> str | None:
         for attempt in range(1, self.retries + 1):

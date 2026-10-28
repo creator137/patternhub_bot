@@ -8,11 +8,12 @@ from app.repositories.products import ProductRepository
 from app.providers.registry import available_providers
 from app.services.catalog import CatalogService
 from app.services.images import photo_urls
+from app.models.catalog_policy import free_section_sql, new_section_sql, NEW_WINDOW_DAYS
 
 FILTERS = ("search", "category", "source", "audience", "is_new", "is_sale", "is_free", "is_beginner", "is_knit", "sort")
 MENUS = ("women", "men", "kids", "unisex")
 SORTS = {"name": "p.name, p.id", "price_asc": "p.price IS NULL, CAST(p.price AS REAL), p.id",
-         "new_first": "p.is_new DESC, p.name, p.id",
+         "new_first": f"{new_section_sql('p.')} DESC, CASE WHEN {new_section_sql('p.')} THEN julianday(p.source_published_at) END DESC, p.name, p.id",
          "price_desc": "p.price IS NULL, CAST(p.price AS REAL) DESC, p.id"}
 
 
@@ -64,7 +65,8 @@ class WebCatalogRepository(ProductRepository):
         for key in ("source", "audience", "category", "is_new", "is_sale", "is_free", "is_beginner", "is_knit"):
             value = query.get(key)
             if key in active and value is not None and value != "":
-                column = "COALESCE(o.category,p.category)" if key == "category" else f"p.{key}"
+                column = ("COALESCE(o.category,p.category)" if key == "category" else
+                    free_section_sql('p.') if key == 'is_free' else new_section_sql('p.') if key == 'is_new' else f"p.{key}")
                 clauses.append(f"{column}=?")
                 values.append(value)
         if query.get("search") and "search" in active:
@@ -100,7 +102,7 @@ class WebCatalogRepository(ProductRepository):
                 item.update(media)
             else:
                 item.update(thumbnail_url=media['thumbnail_url'], image_count=media['image_count'])
-            item["new_basis"] = "source_label" if item["is_new"] else None
+            item["new_basis"] = "source_publication_date" if item["is_new"] else None
             if admin:
                 item.update(hidden=bool(row["hidden"]), source_enabled=bool(row["source_enabled"]), imported_category=row["category"])
             items.append(item)
@@ -114,11 +116,13 @@ class WebCatalogRepository(ProductRepository):
     def coverage(self):
         keys = (*MENUS, *(key for key in FILTERS if key.startswith('is_')))
         aggregates = [f"COALESCE(SUM(p.audience=?),0) AS {key}" for key in MENUS]
-        aggregates.extend(f"COALESCE(SUM(p.{key}),0) AS {key}" for key in keys if key.startswith('is_'))
+        aggregates.extend(f"COALESCE(SUM({free_section_sql('p.') if key == 'is_free' else new_section_sql('p.') if key == 'is_new' else 'p.' + key}),0) AS {key}" for key in keys if key.startswith('is_'))
         with self.database.connect() as db:
             row = db.execute(f"""SELECT COUNT(*) AS total,
                 COALESCE(SUM(p.audience IS NULL OR p.audience=''),0) AS unknown,
+                COALESCE(SUM(p.source_published_at IS NOT NULL),0) AS dated,
                 {','.join(aggregates)} FROM products p JOIN sources s ON s.name=p.source
                 LEFT JOIN product_overrides o ON o.product_id=p.id
                 WHERE p.is_available=1 AND s.enabled=1 AND COALESCE(o.hidden,0)=0""", MENUS).fetchone()
-        return {'counts': {key: int(row[key]) for key in keys}, 'unknown_audience': row['unknown'], 'total': row['total']}
+        return {'counts': {key: int(row[key]) for key in keys}, 'unknown_audience': row['unknown'], 'total': row['total'],
+                'publication_dates': row['dated'], 'new_window_days': NEW_WINDOW_DAYS}

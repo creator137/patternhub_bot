@@ -20,8 +20,20 @@ test('imported catalog has real results for every main section and quick filter'
     await button.click();
     const data=await (await response).json();
     expect(data.total).toBeGreaterThan(0);
-    expect(data.items.every((p:Record<string,unknown>)=>p[key]===true)).toBe(true);
+    expect(data.items.every((p:Record<string,unknown>)=>key==='is_free'
+      ? p.is_free===true || (p.currency==='RUB' && Number(p.price)===1)
+      : key==='is_new'
+        ? !!p.source_published_at && Date.parse(String(p.source_published_at))>=Date.now()-60*86400000 && Date.parse(String(p.source_published_at))<=Date.now()
+        : p[key]===true)).toBe(true);
     await expect(page.locator('.product-card').first()).toBeVisible();
+    await expect.poll(()=>page.locator('.product-card img').first().evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0),{timeout:20000}).toBe(true);
+    if(key==='is_free') {
+      const one=data.items.find((p:Record<string,unknown>)=>p.currency==='RUB'&&Number(p.price)===1);
+      expect(one).toBeTruthy();
+      const card=page.locator('.product-card').filter({has:page.locator(`a[href="#/product/${one.id}"]`)});
+      await expect(card.locator('.price')).toContainText('1 ₽');
+      await expect(card).not.toContainText('БЕСПЛАТНО');
+    }
     await page.screenshot({path:`test-results/filter-${key}.png`});
     const reset=page.waitForResponse(r=>r.url().includes('/api/products?')&&!new URL(r.url()).searchParams.has(key));
     await button.click();

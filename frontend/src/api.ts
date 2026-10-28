@@ -2,6 +2,8 @@ export type Product = {
   id: number;
   name: string;
   source: string;
+  source_published_at?: string | null;
+  source_new_badge?: boolean;
   brand: string | null;
   category: string | null;
   imported_category?: string | null;
@@ -32,7 +34,7 @@ export type Product = {
 export type UIItem = { key: string; enabled: boolean };
 export type UISettings = { filters: UIItem[]; menu: UIItem[] };
 export type Meta = {
-  coverage: {counts: Record<string,number>; unknown_audience:number; total:number};
+  coverage: {counts: Record<string,number>; unknown_audience:number; total:number; publication_dates?:number; new_window_days?:number};
   ui: UISettings;
   categories: { name: string; count: number }[];
   brands: { source: string; name: string; count: number }[];
@@ -107,7 +109,7 @@ export const labels: Record<string, string> = {
   audience: "Для кого",
   is_new: "Новинки",
   is_sale: "Скидки",
-  is_free: "Бесплатные",
+  is_free: "Бесплатные и за 1 ₽",
   is_beginner: "Для начинающих",
   is_knit: "Трикотаж",
   sort: "Сортировка",

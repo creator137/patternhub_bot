@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import json
 import asyncio
+from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock
 
 from app.database import Database
@@ -99,7 +100,8 @@ class FilterEnrichmentTests(unittest.TestCase):
             self.repo.set_filter_metadata(product.id, {'is_free':True}, expected_url=product.product_url)
 
     def test_new_first_keeps_all_products_while_new_filter_is_explicit(self):
-        self.repo.upsert_many([self.product, replace(self.product, source='sewitnow', name='Я новинка', is_new=True)])
+        self.repo.upsert_many([self.product, replace(self.product, source='sewitnow', name='Я новинка', is_new=True,
+            source_published_at=datetime.now(timezone.utc)-timedelta(days=1))])
         repo = WebCatalogRepository(self.db)
         result = repo.page({'sort':'new_first'})
         self.assertEqual(result['total'],2)

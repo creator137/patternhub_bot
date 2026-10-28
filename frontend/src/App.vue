@@ -63,7 +63,7 @@ try {
 } catch { /* browsing remains available without storage */ }
 let listRequest: AbortController | null = null;
 const sortOptions = [
-  { label: "Сначала новинки", value: "new_first" },
+  { label: "Сначала новинки (60 дней)", value: "new_first" },
   { label: "По названию", value: "name" },
   { label: "Сначала дешевле", value: "price_asc" },
   { label: "Сначала дороже", value: "price_desc" },
@@ -316,7 +316,7 @@ onUnmounted(() => {
             }}</del>
           </p>
           <div class="chips">
-            <span v-if="detail.is_new">Новинка у бренда</span
+            <span v-if="detail.is_new">Опубликовано за последние 60 дней</span
             ><span v-if="detail.is_sale">Скидка</span
             ><span v-if="detail.is_beginner">Для начинающих</span
             ><span v-if="detail.is_knit">Трикотаж</span>
@@ -329,6 +329,7 @@ onUnmounted(() => {
                 ['Размеры', detail.sizes?.join(', ')],
                 ['Рост', detail.heights?.join(', ')],
                 ['Сложность', detail.difficulty],
+                ['Опубликовано у бренда', detail.source_published_at ? new Date(detail.source_published_at).toLocaleDateString('ru-RU', {timeZone:'UTC'}) : null],
               ]"
               :key="entry[0] || ''"
               ><template v-if="entry[1]"
@@ -469,11 +470,15 @@ onUnmounted(() => {
           У {{ meta.coverage.unknown_audience }} выкроек аудитория пока не определена:
           они доступны в разделе «Все выкройки».
         </p>
-        <p v-if="filters.is_new" class="muted small" role="note">
-          Только подтверждённые новинки. Не все источники передают этот признак.
-          <button v-if="enabled.includes('sort')" class="reset" @click="filters.is_new = null; filters.sort = 'new_first'">
+        <p v-if="filters.is_new || filters.sort === 'new_first'" class="muted small" role="note">
+          {{ filters.is_new ? 'Опубликованы производителем за последние 60 дней.' : 'Подтверждённые новинки — в начале, остальные — по названию.' }}
+          Даты известны у {{ meta?.coverage.publication_dates || 0 }} из {{ meta?.coverage.total }} выкроек.
+          <button v-if="filters.is_new && enabled.includes('sort')" class="reset" @click="filters.is_new = null; filters.sort = 'new_first'">
             Весь каталог, сначала новинки
           </button>
+        </p>
+        <p v-if="filters.is_free" class="muted small" role="note">
+          Бесплатные выкройки и модели за 1 ₽. В карточке указана реальная цена производителя.
         </p>
         <div v-if="error" class="empty" role="alert">
           <h2>Каталог временно недоступен</h2>

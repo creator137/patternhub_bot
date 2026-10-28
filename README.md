@@ -211,3 +211,4 @@ Mini App использует локальные WebP-превью и галер
 [MEDIA_PIPELINE.md](docs/MEDIA_PIPELINE.md).
 
 Разметка и проверка фильтров: [FILTER_AUDIT.md](docs/FILTER_AUDIT.md).
+Правило 60 дней и раздел с позициями за 1 ₽: [PUBLICATION_POLICY.md](docs/PUBLICATION_POLICY.md).

@@ -8,6 +8,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from app.models.audience import normalize_audience
 from app.models.categories import normalize_category
+from app.models.catalog_policy import publication_datetime, is_recent_publication
 
 
 def _clean_text(value: str | None) -> str | None:
@@ -87,6 +88,8 @@ class ParsedProduct:
     image_urls: tuple[str, ...] | None = None
     is_available: bool = True
     source_updated_at: datetime | None = None
+    source_published_at: datetime | None = None
+    source_new_badge: bool | None = None
 
     def normalized(self) -> "ParsedProduct":
         source = (_clean_text(self.source) or "").lower()
@@ -111,6 +114,8 @@ class ParsedProduct:
         ) else self.is_beginner
         is_knit = True if _has_text_marker((subcategory,), ("трикотаж",)) else self.is_knit
         images = tuple(dict.fromkeys(_clean_url(url) for url in self.image_urls or () if url))
+        published = publication_datetime(self.source_published_at)
+        source_badge = self.source_new_badge if self.source_new_badge is not None else self.is_new
         return replace(
             self,
             source=source,
@@ -125,7 +130,8 @@ class ParsedProduct:
             currency=(_clean_text(self.currency) or "").upper() or None,
             is_sale=is_sale,
             is_free=is_free,
-            is_new=bool(self.is_new),
+            is_new=is_recent_publication(published),
+            source_new_badge=bool(source_badge),
             is_beginner=is_beginner,
             is_knit=is_knit,
             sizes=_clean_values(self.sizes),
@@ -135,6 +141,7 @@ class ParsedProduct:
             product_url=_clean_url(self.product_url),
             image_url=_clean_url(self.image_url) if self.image_url else (images[0] if images else None),
             image_urls=images if self.image_urls is not None else None,
+            source_published_at=published,
         )
 
 
@@ -169,6 +176,8 @@ class Product:
     updated_at: datetime
     source_updated_at: datetime | None
     image_urls: tuple[str, ...] | None = None
+    source_published_at: datetime | None = None
+    source_new_badge: bool = False
 
 
 @dataclass(frozen=True, slots=True)

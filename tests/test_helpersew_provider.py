@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timezone, timedelta
 
 import tempfile
 import unittest
@@ -39,7 +40,8 @@ class HelperSewProviderTests(unittest.TestCase):
         self.assertEqual(first.audience, "women")
         self.assertEqual(first.price, Decimal("329.00"))
         self.assertEqual(first.category, "Платья")
-        self.assertTrue(first.is_new)
+        self.assertTrue(first.source_new_badge)
+        self.assertFalse(first.is_new)  # Badge alone does not prove a 60-day release date.
         self.assertFalse(first.is_sale)
         self.assertEqual(
             first.image_url,
@@ -116,7 +118,8 @@ class HelperSewProviderTests(unittest.TestCase):
         self.assertEqual(product.sizes, ("40–54",))
         self.assertEqual(product.heights, ("149-184",))
         self.assertEqual(product.difficulty, "Уровень сложности: Средний")
-        self.assertTrue(product.is_new)
+        self.assertTrue(product.source_new_badge)
+        self.assertFalse(product.is_new)
 
     def test_helpersew_men_and_kids_keep_product_category(self) -> None:
         men = ParsedProduct(
@@ -245,6 +248,7 @@ class HelperSewRepositoryIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     brand="HelperSew",
                     category="Платья и сарафаны",
                     is_new=True,
+                    source_published_at=datetime.now(timezone.utc)-timedelta(days=1),
                     product_url="https://helpersew.com/catalog/3/",
                 ),
             ]
