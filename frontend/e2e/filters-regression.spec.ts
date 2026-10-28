@@ -1,14 +1,15 @@
 import {test,expect} from '@playwright/test';
 test.setTimeout(60000);
-test('universal controls clear unsupported stale filters',async({page})=>{
- await page.addInitScript(()=>sessionStorage.setItem('allsewpattern.filters',JSON.stringify({audience:'men',is_new:true,is_knit:true,is_beginner:true,sort:'new_first'})));
+test('all catalog controls are available again',async({page})=>{
  await page.goto('/');await expect(page.locator('.product-card').first()).toBeVisible();
- await expect(page.locator('.audiences button,.quick button,.catalog-sort')).toHaveCount(0);
- const stored=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('allsewpattern.filters')||'{}'));
- expect(stored.audience).toBeNull();expect(stored.is_new).toBeNull();expect(stored.is_knit).toBeNull();expect(stored.sort).toBe('name');
+ await expect(page.locator('.audiences button')).toHaveCount(5);
+ await expect(page.locator('.toolbar').getByRole('combobox',{name:'Сортировка'})).toBeVisible();
  await page.getByRole('button',{name:/^Фильтры/}).click();
- await expect(page.locator('.filter-drawer').getByRole('combobox')).toHaveCount(2);
- await expect(page.locator('.filter-drawer').getByRole('switch')).toHaveCount(0);
+ const drawer=page.locator('.filter-drawer');
+ await expect(drawer.getByRole('combobox')).toHaveCount(4);
+ for(const label of ['За последние 60 дней','Скидки','Бесплатные и за 1 ₽','Для начинающих','Трикотаж'])
+  await expect(drawer.locator('.toggle-row').filter({hasText:label}).getByRole('switch')).toBeVisible();
+ await page.screenshot({path:'test-results/restored-filters.png'});
 });
 test('alphabetical brands and category intersection have accurate counts',async({page})=>{
  await page.goto('/');await expect(page.locator('.product-card').first()).toBeVisible();
@@ -24,4 +25,18 @@ test('alphabetical brands and category intersection have accurate counts',async(
  expect(data.items.every((p:{source:string;category:string})=>p.source==='grasser'&&p.category==='Брюки и шорты')).toBe(true);
  await expect(drawer.getByRole('button',{name:'Показать · '+data.total,exact:true})).toBeVisible();
  await page.screenshot({path:'test-results/common-filters.png'});
+});
+test('Grasser knit pants keep their filters when switching sort order',async({page})=>{
+ await page.goto('/');await expect(page.locator('.product-card').first()).toBeVisible();
+ await page.getByRole('button',{name:/^Фильтры/}).click();const drawer=page.locator('.filter-drawer');
+ await drawer.getByRole('combobox',{name:'Все бренды'}).click();await page.getByRole('option',{name:'Grasser',exact:true}).click();
+ await drawer.getByRole('combobox',{name:'Все категории'}).click();await page.getByRole('option',{name:'Брюки и шорты',exact:true}).click();
+ const response=page.waitForResponse(r=>r.url().includes('/api/products?')&&r.url().includes('source=grasser')&&r.url().includes('is_knit=true'));
+ await drawer.locator('.toggle-row').filter({hasText:'Трикотаж'}).getByRole('switch').click();
+ const data=await(await response).json();expect(data.total).toBeGreaterThan(0);
+ expect(data.items.every((p:{source:string;category:string;is_knit:boolean})=>p.source==='grasser'&&p.category==='Брюки и шорты'&&p.is_knit)).toBe(true);
+ await drawer.getByRole('combobox',{name:'Сортировка',exact:true}).click();
+ const sorted=page.waitForResponse(r=>r.url().includes('/api/products?')&&r.url().includes('sort=name')&&r.url().includes('is_knit=true'));
+ await page.getByRole('option',{name:'По названию',exact:true}).click();
+ expect((await(await sorted).json()).total).toBe(data.total);
 });

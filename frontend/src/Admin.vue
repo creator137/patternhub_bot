@@ -71,8 +71,7 @@ async function changeTab(value: string) {
 }
 function move(list: UIItem[], entry:UIItem) {
   const index=list.indexOf(entry);
-  let previous=index-1;
-  while(previous>=0 && !props.meta.common_filters.includes(list[previous].key))previous--;
+  const previous=index-1;
   if(previous>=0)[list[previous],list[index]]=[list[index],list[previous]];
 }
 function edit(p: Product) {
@@ -182,13 +181,13 @@ onMounted(async () => {
     <template v-if="tab === 'filters'"
       ><div class="admin-grid">
         <section
-          v-for="group in ['filters'] as const"
+          v-for="group in ['filters', 'menu'] as const"
           :key="group"
           class="panel"
         >
-          <h2>Общие фильтры</h2>
+          <h2>{{ group === 'filters' ? 'Фильтры' : 'Разделы по аудитории' }}</h2>
           <div
-            v-for="(entry, index) in ui[group].filter(entry=>props.meta.common_filters.includes(entry.key))"
+            v-for="(entry, index) in ui[group]"
             :key="entry.key"
             class="setting-row"
           >

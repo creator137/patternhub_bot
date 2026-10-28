@@ -13,6 +13,7 @@ from app.web.main import create_app
 from app.models.categories import normalize_product_category
 from app.handlers.catalog import create_main_keyboard
 from app.services.images import MEDIA_HOSTS
+from app.web.catalog import FILTERS, MENUS, WebCatalogRepository
 
 
 class SupplierTests(unittest.TestCase):
@@ -34,11 +35,17 @@ class SupplierTests(unittest.TestCase):
         mary=next(p for p in public if p['source']=='marymake')
         self.assertIn('marymake.ru',mary['url'])
 
-    def test_only_universal_controls_are_visible_without_erasing_imported_facts(self):
+    def test_all_controls_are_restored_and_admin_visibility_is_respected(self):
         meta=self.client.get('/api/meta').json()
-        self.assertEqual({f['key'] for f in meta['ui']['filters'] if f['enabled']},{'search','category','source'})
-        self.assertFalse(any(m['enabled'] for m in meta['ui']['menu']))
+        self.assertEqual({f['key'] for f in meta['ui']['filters'] if f['enabled']},set(FILTERS))
+        self.assertEqual({m['key'] for m in meta['ui']['menu'] if m['enabled']},set(MENUS))
         self.assertEqual(meta['supplier_count'],88)
+        for item in meta['ui']['filters']:
+            if item['key']=='is_knit':item['enabled']=False
+        WebCatalogRepository(self.db).save_settings(meta['ui'])
+        public=self.client.get('/api/meta').json()['ui']
+        self.assertFalse(next(item['enabled'] for item in public['filters'] if item['key']=='is_knit'))
+        self.assertTrue(next(item['enabled'] for item in public['filters'] if item['key']=='is_beginner'))
 
     def test_directory_counts_only_public_available_products(self):
         self.repo.upsert_many([ParsedProduct(source='grasser',source_product_id='1',name='Платье',product_url='https://grasser.ru/1'),

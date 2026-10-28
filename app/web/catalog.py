@@ -62,14 +62,9 @@ class WebCatalogRepository(ProductRepository):
             db.execute("INSERT INTO settings(key,value) VALUES('miniapp.ui',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP", (json.dumps(value),))
 
     def public_settings(self):
-        # Preserve imported facts and internal API capabilities, while exposing
-        # only controls supported across the expanded supplier list.
-        value = json.loads(json.dumps(self.settings()))
-        for entry in value['filters']:
-            entry['enabled'] = bool(entry['enabled'] and entry['key'] in COMMON_FILTERS)
-        for entry in value['menu']:
-            entry['enabled'] = False
-        return value
+        # Visibility follows the administrator's settings, including optional
+        # source facts. Expanding the directory must not silently hide controls.
+        return self.settings()
 
     def public_suppliers(self):
         with self.database.connect() as db:
