@@ -55,7 +55,7 @@ def _has_beginner_marker(values: tuple[str | None, ...]) -> bool:
         if re.search(r'не\s+(?:подход\w*|предназнач\w*|рекоменд\w*)[^.!?]{0,60}(?:начинающ|нович)', sentence):
             continue
         if any(marker in sentence for marker in markers) or re.search(
-            r'(?:уровень сложности|сложность|difficulty)\s*:\s*1\b', sentence
+            r'(?:уровень сложности|сложность|difficulty)\s*:\s*(?:1\b|новичок\b)', sentence
         ):
             return True
     return False

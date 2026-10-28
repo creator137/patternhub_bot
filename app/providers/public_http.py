@@ -14,10 +14,16 @@ class CatalogFetchError(RuntimeError):
     pass
 
 
+class CatalogHTTPError(CatalogFetchError):
+    def __init__(self, status_code, url):
+        self.status_code, self.url = status_code, url
+        super().__init__(f'HTTP {status_code}: {url}')
+
+
 class RobotsRules:
     def __init__(self, text: str, user_agent: str = 'patternhubbot'):
         groups, agents, rules = [], [], []
-        for line in text.splitlines() + ['User-agent: end']:
+        for line in text.lstrip('\ufeff').splitlines() + ['User-agent: end']:
             line = line.split('#', 1)[0].strip()
             if ':' not in line:
                 continue
@@ -52,7 +58,7 @@ class RobotsRules:
 
 
 class PublicCatalogHTTP:
-    def __init__(self, base_url: str, *, timeout=30, retries=3, transport=None):
+    def __init__(self, base_url: str, *, timeout=30, retries=3, transport=None, robots_allow=()):
         origin = urlsplit(base_url)
         host = origin.hostname.removeprefix('www.')
         self.hosts = {host, 'www.' + host}
@@ -64,6 +70,15 @@ class PublicCatalogHTTP:
         self.requests_made = self.retries_made = 0
         self.robots = None
         self.last_request = 0
+        # Operator-reviewed public storefront routes, authorized by the owner.
+        # Defaults remain strict; never broaden to admin/account/cart endpoints.
+        self.robots_allow = tuple(re.compile(pattern) for pattern in robots_allow)
+
+    def allows(self, url):
+        path = urlsplit(url).path or '/'
+        if urlsplit(url).query:
+            path += '?' + urlsplit(url).query
+        return bool(self.robots and self.robots.allows(url)) or any(p.fullmatch(path) for p in self.robots_allow)
 
     async def __aenter__(self):
         try:
@@ -84,26 +99,36 @@ class PublicCatalogHTTP:
         await self.client.aclose()
 
     async def get(self, url: str):
-        if self.robots is None or not self.robots.allows(url):
+        if self.robots is None or not self.allows(url):
             raise CatalogFetchError('Robots disallows ' + url)
         response = await self._request(url)
         if response.status_code != 200:
-            raise CatalogFetchError(f'HTTP {response.status_code}: {url}')
+            raise CatalogHTTPError(response.status_code, url)
         return response
 
-    async def _request(self, url: str):
+    async def read_catalog_post(self, url, data):
+        """POST used by an audited public listing's search/load-more form only."""
+        if self.robots is None or not self.allows(url):
+            raise CatalogFetchError('Robots disallows ' + url)
+        response = await self._request(url, method='POST', data=data,
+                                       headers={'X-Requested-With':'XMLHttpRequest'})
+        if response.status_code != 200:
+            raise CatalogHTTPError(response.status_code, url)
+        return response
+
+    async def _request(self, url: str, *, method='GET', data=None, headers=None):
         for redirect in range(6):
             parts = urlsplit(url)
             if parts.scheme not in {'http','https'} or parts.hostname not in self.hosts or parts.username or parts.password:
                 raise CatalogFetchError('Catalog URL changed origin')
-            if redirect and self.robots and not self.robots.allows(url):
+            if redirect and self.robots and not self.allows(url):
                 raise CatalogFetchError('Robots disallows redirect')
             for attempt in range(self.retries):
                 await asyncio.sleep(max(0, .2 - (monotonic() - self.last_request)))
                 self.last_request = monotonic()
                 self.requests_made += 1
                 try:
-                    response = await self.client.get(url)
+                    response = await self.client.request(method, url, data=data, headers=headers)
                     if response.status_code != 429 and response.status_code < 500:
                         break
                     if attempt == self.retries - 1:
@@ -116,5 +141,7 @@ class PublicCatalogHTTP:
             if response.status_code not in {301,302,303,307,308}:
                 return response
             from urllib.parse import urljoin
+            if response.status_code == 303 or (method == 'POST' and response.status_code in {301,302}):
+                method, data = 'GET', None
             url = urljoin(url, response.headers.get('location', ''))
         raise CatalogFetchError('Redirect limit')

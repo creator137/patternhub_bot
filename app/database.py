@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -12,6 +13,7 @@ class Database:
 
     def initialize(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._migrate_product_identity()
         with self.connect() as connection:
             connection.execute('PRAGMA journal_mode=WAL')
             connection.executescript(
@@ -60,12 +62,14 @@ class Database:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     source_updated_at TEXT,
-                    UNIQUE(source, source_product_id),
-                    UNIQUE(source, product_url)
+                    UNIQUE(source, source_product_id)
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_products_source
                     ON products(source);
+                CREATE INDEX IF NOT EXISTS idx_products_source_url ON products(source,product_url);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_products_source_url_fallback
+                    ON products(source,product_url) WHERE source_product_id IS NULL;
                 CREATE INDEX IF NOT EXISTS idx_products_category
                     ON products(category);
                 CREATE INDEX IF NOT EXISTS idx_products_image_url
@@ -185,6 +189,55 @@ class Database:
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+    def _migrate_product_identity(self) -> None:
+        """Replace URL-wide uniqueness with a fallback-only constraint.
+
+        Preserve IDs, added columns, indexes and child foreign keys. SQLite
+        cannot drop a table UNIQUE constraint without rebuilding the table.
+        Foreign keys are disabled only on this migration connection, before
+        its transaction, and checked before commit. Concurrent initializers
+        recheck the schema after acquiring the write lock.
+        """
+        pattern = r',\s*UNIQUE\s*\(\s*source\s*,\s*product_url\s*\)'
+        with self.connect() as db:
+            row = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='products'").fetchone()
+            if not row or not re.search(pattern, row['sql'], re.I):
+                return
+            db.execute('PRAGMA foreign_keys=OFF')
+            try:
+                db.execute('BEGIN IMMEDIATE')
+                sql = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='products'").fetchone()['sql']
+                if not re.search(pattern, sql, re.I):
+                    db.commit()
+                    return
+                sequence = db.execute("SELECT seq FROM sqlite_sequence WHERE name='products'").fetchone() if 'AUTOINCREMENT' in sql.upper() else None
+                objects = [r['sql'] for r in db.execute("SELECT sql FROM sqlite_master WHERE tbl_name='products' AND type IN ('index','trigger') AND sql IS NOT NULL")]
+                sql = re.sub(pattern, '', sql, flags=re.I)
+                sql, count = re.subn(r'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["`]?products["`]?',
+                                     'CREATE TABLE products_identity_migration', sql, count=1, flags=re.I)
+                if count != 1:
+                    raise ValueError('Unrecognized products schema')
+                columns = ','.join('"'+r['name'].replace('"','""')+'"' for r in db.execute('PRAGMA table_info(products)'))
+                db.execute(sql)
+                db.execute(f'INSERT INTO products_identity_migration ({columns}) SELECT {columns} FROM products')
+                db.execute('DROP TABLE products')
+                db.execute('ALTER TABLE products_identity_migration RENAME TO products')
+                if sequence:
+                    db.execute("UPDATE sqlite_sequence SET seq=MAX(seq,?) WHERE name='products'",(sequence['seq'],))
+                    db.execute("INSERT INTO sqlite_sequence(name,seq) SELECT 'products',? WHERE NOT EXISTS(SELECT 1 FROM sqlite_sequence WHERE name='products')",(sequence['seq'],))
+                for statement in objects:
+                    db.execute(statement)
+                db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_source_url_fallback ON products(source,product_url) WHERE source_product_id IS NULL')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_products_source_url ON products(source,product_url)')
+                if db.execute('PRAGMA foreign_key_check').fetchone():
+                    raise ValueError('Foreign key validation failed after product migration')
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+            finally:
+                db.execute('PRAGMA foreign_keys=ON')
 
     @staticmethod
     def _ensure_column(

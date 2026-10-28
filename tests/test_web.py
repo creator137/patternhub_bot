@@ -218,5 +218,24 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/admin/media').status_code,401)
 
 
+    def test_missing_cover_uses_another_real_photo_but_not_for_carousel_indices(self):
+        from app.services.images import ImageUnavailable
+        urls=['https://grasser.ru/deleted.jpg','https://grasser.ru/real-photo.jpg']
+        with self.db.connect() as db:
+            db.execute('UPDATE products SET image_url=?,image_urls=? WHERE id=1',(urls[0],json.dumps(urls)))
+        media=MediaRepository(self.db)
+        for url in urls:media.register(image_key(url),url)
+        path=Path(self.temp.name)/'fallback.webp';path.write_bytes(b'real-product-photo')
+        async def get(url,*args,**kwargs):
+            if url==urls[0]:raise ImageUnavailable('HTTP 404')
+            return path
+        with patch.object(self.client.app.state.images,'get',new=AsyncMock(side_effect=get)):
+            r=self.client.get('/api/products/1/image/0')
+            self.assertEqual(r.status_code,200);self.assertEqual(r.content,b'real-product-photo')
+        self.assertEqual(media.last_cover(1)['url'],urls[1])
+        with patch.object(self.client.app.state.images,'get',new=AsyncMock(side_effect=ImageUnavailable('404'))):
+            self.assertEqual(self.client.get('/api/products/1/image/1').status_code,503)
+
+
 if __name__ == "__main__":
     unittest.main()

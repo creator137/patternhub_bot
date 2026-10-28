@@ -25,6 +25,8 @@ MEDIA_HOSTS = frozenset({
     "studio-yusupova.ru", "sewitnow.ru", "api.sewitnow.ru",
     "sellty-assets-prod.storage.yandexcloud.net", "static.tildacdn.com", "static.tildacdn.net",
     "cdn-sh1.vigbo.com", "thb.tildacdn.com",
+    "cdn-st2.vigbo.com", "taplink.st", "static.tildacdn.pro", "static.tildacdn.one",
+    "ls-pattern-public.storage.yandexcloud.net", "i0.wp.com", "skrl.hb.bizmrg.com",
 }) | frozenset(
     host
     for supplier in supplier_definitions() if supplier['enabled'] and supplier.get('adapter')

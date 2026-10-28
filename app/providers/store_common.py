@@ -16,6 +16,25 @@ from app.providers.gallery import clean_images
 CATEGORY_NAMES = {c.name for c in CATEGORIES}
 
 
+def woo_image_url(image):
+    """Prefer an advertised display-size image, never guess resize filenames.
+
+    The Mini App renders details at up to 1280px. Some original Woo images
+    exceed 25 megapixels; native srcset derivatives avoid that download and
+    decoding cost without adding duplicate photos to the gallery.
+    """
+    candidates = []
+    for entry in str(image.get('srcset') or '').split(','):
+        parts = entry.strip().rsplit(None, 1)
+        if len(parts) == 2 and re.fullmatch(r'\d+w', parts[1]):
+            width = int(parts[1][:-1])
+            if 0 < width <= 1600:
+                candidates.append((width, parts[0]))
+    if candidates:
+        return min(candidates, key=lambda value: (abs(value[0]-1280), -value[0]))[1]
+    return image.get('src')
+
+
 def plain(value) -> str:
     text = str(value or '')
     return BeautifulSoup(text, 'html.parser').get_text(' ', strip=True) if '<' in text else html.unescape(text).strip()
@@ -51,7 +70,7 @@ def audience_for(categories, specialization):
     values = {normalize_audience(plain(value)) for value in categories} - {None}
     text = ' '.join(plain(value).casefold() for value in categories)
     for pattern, audience in [(r'\b(?:женск|женщин)', 'women'), (r'\b(?:мужск|мужчин)', 'men'),
-                              (r'\b(?:детск|дети|девоч|мальчик|подрост)', 'kids'), (r'\bунисекс\b','unisex')]:
+                              (r'\b(?:детск|дети|детей|детям|девоч|мальчик|подрост)', 'kids'), (r'\bунисекс\b','unisex')]:
         if re.search(pattern, text):
             values.add(audience)
     if 'unisex' in values:
@@ -95,7 +114,9 @@ def product_from_values(config, *, name, url, key=None, price=None, old_price=No
         name=name, brand=config['display_name'], product_url=url,
         category=category_for(name, categories, config.get('specialization','general')),
         subcategory=' / '.join(plain(c) for c in categories) or None,
-        audience=audience_for(categories, config.get('specialization','general')),
+        # Explicit source sections take priority. A literal "мужская" or
+        # "для детей" in its own title is evidence; "рубашка" alone is not.
+        audience=audience_for(categories, config.get('specialization','general')) or audience_for([name], 'general'),
         price=price, old_price=old_price, currency=currency,
         is_free=price == 0 or bool(re.search(r'\bбесплатно\b', name.casefold())),
         image_url=images[0] if images else None, image_urls=images or None,

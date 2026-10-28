@@ -118,9 +118,26 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
         if index < 0 or index >= len(urls):
             raise HTTPException(404, 'Image not found')
         async def prepare_image():
-            path = await images.get(urls[index], size, referer=media['referer'])
+            selected = urls[index]
+            try:
+                path = await images.get(selected, size, referer=media['referer'])
+            except ImageUnavailable:
+                if index != 0:
+                    raise
+                # A deleted cover must not hide the product's other real
+                # photos. Bounded fallback shares the same persistent cache,
+                # SSRF checks, cooldowns and in-flight request coalescing.
+                for candidate in urls[1:4]:
+                    try:
+                        path = await images.get(candidate, size, referer=media['referer'])
+                        selected = candidate
+                        break
+                    except ImageUnavailable:
+                        continue
+                else:
+                    raise
             if index == 0:
-                await asyncio.to_thread(media_repo.set_cover, product_id, image_key(urls[index]))
+                await asyncio.to_thread(media_repo.set_cover, product_id, image_key(selected))
             return path
         key = (product_id, urls[index], size)
         task = image_tasks.get(key)

@@ -4,8 +4,8 @@ test('supplier directory has sorted links and distinguishes imported suppliers',
  expect(await cards.count()).toBeGreaterThanOrEqual(80);const names=await cards.locator('h3').allTextContents();
  expect(names).toEqual([...names].sort((a,b)=>a.localeCompare(b,'ru',{sensitivity:'base',numeric:true})));
  expect(await cards.locator('a.supplier-site').count()).toBe(names.length);
- expect(await cards.filter({has:page.locator('.supplier-products')}).count()).toBeGreaterThan(30);
- expect(await cards.filter({hasNot:page.locator('.supplier-products')}).count()).toBeGreaterThan(0);
+ expect(await cards.filter({has:page.locator('.supplier-products')}).count()).toBe(88);
+ expect(await cards.filter({hasNot:page.locator('.supplier-products')}).count()).toBe(0);
  await expect(page.locator('a[href*="andrianova-pattern.ru"],a[href*="sew-garmentfactory"]')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/suppliers-mobile.png'});

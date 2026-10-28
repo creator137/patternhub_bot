@@ -45,7 +45,7 @@ def validate_document(document):
         seen.add(source)
         definition = supplier_definition(source)
         host = urlsplit(definition['base_url']).hostname.removeprefix('www.')
-        products, keys, urls = [], set(), set()
+        products, keys, urls = [], set(), {}
         for raw in entry['products']:
             values = dict(raw)
             for field in ['price','old_price']:
@@ -63,10 +63,11 @@ def validate_document(document):
                     values[field] = tuple(values[field])
             product = ParsedProduct(**values).normalized()
             key = product.source_product_id or product.product_url
-            if (product.source != source or key in keys or product.product_url in urls
+            if (product.source != source or key in keys or
+                    (product.product_url in urls and (not product.source_product_id or not urls[product.product_url]))
                     or urlsplit(product.product_url).hostname.removeprefix('www.') != host):
                 raise ValueError('Product identity/origin mismatch in snapshot')
-            keys.add(key); urls.add(product.product_url); products.append(product)
+            keys.add(key); urls[product.product_url]=product.source_product_id; products.append(product)
         if not products:
             raise ValueError('Empty complete snapshot')
         sources.append(SnapshotProvider(source, products, int(entry.get('skipped',0))))

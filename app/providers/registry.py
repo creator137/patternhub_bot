@@ -23,6 +23,29 @@ def create_provider(source: str, **kwargs: object) -> BaseProvider:
         from app.providers.public_stores import WooStoreProvider, WooHTMLProvider, TildaSitemapProvider, VigboProvider
         definition = supplier_definition(source)
         adapters = {'woo_store':WooStoreProvider, 'woo_html':WooHTMLProvider, 'tilda_sitemap':TildaSitemapProvider,'vigbo':VigboProvider}
+        from app.providers.opencart import OpenCartProvider
+        from app.providers.bitrix_catalog import BitrixCatalogProvider
+        from app.providers.insales_catalog import OctoberCatalogProvider, AnsewsCatalogProvider, ShapeCatalogProvider, LokoCatalogProvider
+        from app.providers.wordpress_catalog import WordPressSitemapProvider
+        from app.providers.wordpress_posts import WordPressPostsProvider
+        from app.providers.tilda_extended import ExtendedTildaProvider
+        from app.providers.tilda_api import TildaAPIProvider
+        from app.providers.independent_catalogs import PatternEasyProvider, IndependentListingProvider
+        from app.providers.lekala_legacy import LekalaLegacyProvider
+        from app.providers.shkatulka import ShkatulkaProvider
+        from app.providers.taplink import TaplinkProvider
+        from app.providers.virtuemart import VirtueMartProvider
+        from app.providers.marymake import MarymakeProvider
+        from app.providers.burda import BurdaProvider
+        from app.providers.easysew import EasySewProvider
+        adapters.update(opencart=OpenCartProvider, bitrix_catalog=BitrixCatalogProvider,
+            october=OctoberCatalogProvider, ansews=AnsewsCatalogProvider, shape=ShapeCatalogProvider,
+            loko=LokoCatalogProvider, wordpress_sitemap=WordPressSitemapProvider,
+            wordpress_posts=WordPressPostsProvider, tilda_extended=ExtendedTildaProvider,
+            tilda_api=TildaAPIProvider, patterneasy=PatternEasyProvider,
+            independent_html=IndependentListingProvider, lekala_legacy=LekalaLegacyProvider,
+            shkatulka=ShkatulkaProvider, taplink=TaplinkProvider, virtuemart=VirtueMartProvider,
+            marymake=MarymakeProvider, burda=BurdaProvider, easysew=EasySewProvider)
         if not definition or definition.get('adapter') not in adapters:
             raise ValueError(f"Unknown or not implemented source: {source}")
         return adapters[definition['adapter']](definition,

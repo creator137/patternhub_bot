@@ -68,6 +68,8 @@ class ProductRepository:
                 existing_id = self._find_existing_id(connection, product)
                 values = self._values(product)
                 if existing_id is not None:
+                    if product.source_product_id is None:
+                        values.pop('source_product_id', None)
                     for field in ('is_beginner', 'is_knit', 'sizes', 'heights', 'difficulty', 'description', 'source_published_at'):
                         if getattr(product, field) is None:
                             values.pop(field, None)
@@ -540,11 +542,16 @@ class ProductRepository:
             ).fetchone()
             if row:
                 return row["id"]
-        row = connection.execute(
-            "SELECT id FROM products WHERE source = ? AND product_url = ?",
-            (product.source, product.product_url),
-        ).fetchone()
-        return row["id"] if row else None
+            row = connection.execute(
+                "SELECT id FROM products WHERE source=? AND product_url=? AND source_product_id IS NULL",
+                (product.source,product.product_url)).fetchone()
+            return row['id'] if row else None
+        rows = connection.execute(
+            "SELECT id FROM products WHERE source=? AND product_url=? ORDER BY source_product_id IS NOT NULL LIMIT 2",
+            (product.source,product.product_url)).fetchall()
+        return rows[0]['id'] if len(rows)==1 else next((row['id'] for row in connection.execute(
+            'SELECT id FROM products WHERE source=? AND product_url=? AND source_product_id IS NULL',
+            (product.source,product.product_url))),None)
 
     @staticmethod
     def _values(product: ParsedProduct) -> dict[str, object]:

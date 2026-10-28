@@ -8,25 +8,26 @@ from urllib.parse import urljoin, urlsplit, urlencode
 from bs4 import BeautifulSoup
 
 from app.providers.base import BaseProvider, ProviderResult
-from app.providers.gallery import html_gallery
+from app.providers.gallery import html_gallery, clean_images
 from app.providers.public_http import PublicCatalogHTTP, CatalogFetchError
-from app.providers.store_common import money, plain, product_from_values, tilda_product
+from app.providers.store_common import money, plain, product_from_values, tilda_product, woo_image_url
 
 logger = logging.getLogger(__name__)
 
 
 class PublicStoreProvider(BaseProvider):
-    def __init__(self, config, *, max_pages=1000, transport=None):
+    def __init__(self, config, *, max_pages=None, transport=None):
         self.config = dict(config)
         self.source = config['source']
         self.base_url = config['base_url'].rstrip('/')
-        self.max_pages = max_pages
+        self.max_pages = int(max_pages if max_pages is not None else config.get('max_pages', 1000))
         self.transport = transport
         self.requests_made = self.retries_made = self.last_skipped = 0
 
     async def fetch_products(self):
         self.last_skipped = 0
-        http = PublicCatalogHTTP(self.base_url, transport=self.transport)
+        http = PublicCatalogHTTP(self.base_url, transport=self.transport, timeout=self.config.get("http_timeout",30),
+                                 robots_allow=self.config.get('robots_allow', ()))
         try:
             async with http:
                 products = await self.crawl(http)
@@ -59,9 +60,12 @@ class WooStoreProvider(PublicStoreProvider):
     async def crawl(self, http):
         products, seen = [], set()
         expected = None
+        page_size = int(self.config.get('page_size', 100))
+        if not 1 <= page_size <= 100:
+            raise ValueError('Woo page size must be between 1 and 100')
         endpoint = self.base_url + '/wp-json/wc/store/v1/products'
         for page in range(1, self.max_pages + 1):
-            response = await http.get(endpoint + '?' + urlencode({'per_page':100,'page':page}))
+            response = await http.get(endpoint + '?' + urlencode({'per_page':page_size,'page':page}))
             rows = response.json()
             if not isinstance(rows,list):
                 raise CatalogFetchError('Woo products is not a list')
@@ -74,7 +78,7 @@ class WooStoreProvider(PublicStoreProvider):
             for row in rows:
                 self.add(products, self.parse_product(row))
             total_pages = response.headers.get('X-WP-TotalPages')
-            if (total_pages and page >= int(total_pages)) or (not total_pages and len(rows) < 100):
+            if (total_pages and page >= int(total_pages)) or (not total_pages and len(rows) < page_size):
                 if expected is not None and len(seen) != expected:
                     raise CatalogFetchError('Woo total changed during pagination')
                 return products
@@ -100,12 +104,15 @@ class WooStoreProvider(PublicStoreProvider):
         announced = any(re.search(r'анонс|скоро в продаже', category, re.I) for category in categories)
         return product_from_values(self.config, key=row['id'], name=row['name'], url=row['permalink'],
             price=price, old_price=old, currency=prices.get('currency_code'), categories=categories,
-            images=[i.get('src') for i in row.get('images',[]) if isinstance(i,dict)],
+            images=[woo_image_url(i) for i in row.get('images',[]) if isinstance(i,dict)],
             description=row.get('description') or row.get('short_description'), sizes=sizes, heights=heights,
             available=bool(row.get('is_in_stock',True)) and not announced)
 
     def parse_gallery(self, html, product_url):
-        return html_gallery(html, product_url, '.woocommerce-product-gallery img')
+        soup = BeautifulSoup(html, 'html.parser')
+        images = [woo_image_url({'src':n.get('data-large_image') or n.get('data-src') or n.get('src'),
+                                'srcset':n.get('srcset')}) for n in soup.select('.woocommerce-product-gallery img')]
+        return clean_images(images, product_url) or html_gallery(html, product_url)
 
 
 class WooHTMLProvider(PublicStoreProvider):
@@ -244,7 +251,9 @@ class VigboProvider(PublicStoreProvider):
         link = card.select_one('a.product[href]')
         if title is None or link is None:
             raise ValueError('Vigbo product markup missing')
-        price = card.select_one('.product-price-min')
+        regular = card.select_one('.product-price-min')
+        discount = card.select_one('.product-price-discount')
+        price = discount if discount and money(discount.get_text(' ', strip=True)) is not None else regular
         old = card.select_one('.product-price-old, .old-price, del')
         raw_price = price.get_text(' ',strip=True) if price else ''
         currency = 'RUB' if re.search(r'(?:[рp]уб|₽)', raw_price, re.I) else self.config.get('currency')

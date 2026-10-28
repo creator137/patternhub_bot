@@ -43,11 +43,12 @@
     "source": "mamashilamalishu",
     "display_name": "мама шила малышу",
     "base_url": "https://mamashilamalishu.ru",
-    "catalog_url": "https://mamashilamalishu.ru",
+    "catalog_url": "https://mamashilamalishu.ru/vykrojki",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "october",
+    "max_pages": 2500
   },
   {
     "source": "shapeinspace",
@@ -57,7 +58,7 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "shape"
   },
   {
     "source": "laforme",
@@ -67,7 +68,10 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "woo_store",
+    "robots_allow": [
+      "/wp-json/wc/store/v1/products(?:\\?.*)?"
+    ]
   },
   {
     "source": "elenapatternstudio",
@@ -77,7 +81,9 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "wordpress_sitemap",
+    "max_pages": 2000,
+    "sitemap_url": "https://elenapatternstudio.ru/sitemap.xml"
   },
   {
     "source": "studio_yusupova",
@@ -103,11 +109,14 @@
     "source": "patterneasy",
     "display_name": "Выкройки легко",
     "base_url": "https://patterneasy.com",
-    "catalog_url": "https://patterneasy.com",
+    "catalog_url": "https://patterneasy.com/tags",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "patterneasy",
+    "robots_allow": [
+      "/tags\\?page=\\d+"
+    ]
   },
   {
     "source": "elena_plenkina",
@@ -117,19 +126,21 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "candidate_adapter": "woo_store",
-    "note": "Полный Store API нестабилен: ReadTimeout. До подтверждения полного импорта — только ссылка."
+    "adapter": "woo_store",
+    "page_size": 20
   },
   {
     "source": "your_tailor",
     "display_name": "Your Tailor",
     "base_url": "https://your-tailor.ru",
-    "catalog_url": "https://your-tailor.ru",
+    "catalog_url": "https://your-tailor.ru/patterns",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "vigbo",
+    "robots_allow": [
+      "/patterns/?\\?page=\\d+"
+    ]
   },
   {
     "source": "lekamarket",
@@ -165,11 +176,18 @@
     "source": "burdastyle",
     "display_name": "Бурда",
     "base_url": "https://burdastyle.ru",
-    "catalog_url": "https://burdastyle.ru",
+    "catalog_url": "https://burdastyle.ru/vikroyki/?per-page=96",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "burda",
+    "template": "burda",
+    "max_pages": 1200,
+    "robots_allow": [
+      "/(?:vikroyki|vykrojki|store)/[^?]*\\?(?:page|per-page)=.*"
+    ],
+    "http_timeout": 90,
+    "crawl_checkpoint": "data/provider_crawls/burdastyle"
   },
   {
     "source": "lokopatterns",
@@ -179,17 +197,21 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "loko"
   },
   {
     "source": "shkatulka_sew",
     "display_name": "шкатулка выкройки",
     "base_url": "https://shkatulka-sew.ru",
-    "catalog_url": "https://shkatulka-sew.ru",
+    "catalog_url": "https://shkatulka-sew.ru/pattern/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "shkatulka",
+    "robots_allow": [
+      "/pattern/\\?page=\\d+"
+    ],
+    "max_pages": 1500
   },
   {
     "source": "ansews",
@@ -199,7 +221,7 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "ansews"
   },
   {
     "source": "vselekala",
@@ -225,11 +247,11 @@
     "source": "patternclo",
     "display_name": "ПатернКло",
     "base_url": "https://patternclo.ru",
-    "catalog_url": "https://patternclo.ru",
+    "catalog_url": "https://patternclo.ru/catalog/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "bitrix_catalog"
   },
   {
     "source": "helenpatterns",
@@ -239,8 +261,7 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+    "adapter": "woo_store"
   },
   {
     "source": "lebovi",
@@ -256,11 +277,23 @@
     "source": "easysew",
     "display_name": "Easy sews",
     "base_url": "https://easysew.info",
-    "catalog_url": "https://easysew.info",
+    "catalog_url": "https://easysew.info/catalogy/1/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "easysew",
+    "robots_allow": [
+      "/catalogy/[123]/\\?PAGEN_\\d+=\\d+"
+    ],
+    "bitrix": {
+      "strategy": "listing",
+      "catalog_paths": [
+        "/catalogy/1/",
+        "/catalogy/2/",
+        "/catalogy/3/"
+      ]
+    },
+    "enrich_details": true
   },
   {
     "source": "dress_layout",
@@ -276,11 +309,11 @@
     "source": "lspatterns",
     "display_name": "lspatterns.ru",
     "base_url": "https://lspatterns.ru",
-    "catalog_url": "https://lspatterns.ru",
+    "catalog_url": "https://lspatterns.ru/collection/vse-vykroyki/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "bitrix_catalog"
   },
   {
     "source": "wanttosew",
@@ -290,7 +323,13 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "independent_html",
+    "template": "wanttosew",
+    "max_pages": 1200,
+    "robots_allow": [
+      "/(?:vikroyki|vykrojki|store)/[^?]*\\?(?:page|per-page)=.*"
+    ],
+    "detail_prices": true
   },
   {
     "source": "sew_light",
@@ -306,43 +345,69 @@
     "source": "sewfreedom",
     "display_name": "SewFreedom",
     "base_url": "https://sewfreedom.ru",
-    "catalog_url": "https://sewfreedom.ru",
+    "catalog_url": "https://sewfreedom.ru/katalog/zhenschinam",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "independent_html",
+    "template": "sewfreedom",
+    "max_pages": 1200,
+    "robots_allow": [
+      "/(?:vikroyki|vykrojki|store)/[^?]*\\?(?:page|per-page)=.*",
+      "/katalog/(?:zhenschinam|detyam|muzhchinam)/page\\d+"
+    ],
+    "listing_urls": [
+      "/katalog/zhenschinam",
+      "/katalog/detyam",
+      "/katalog/muzhchinam"
+    ],
+    "section_labels": {
+      "/zhenschinam/": "Женские выкройки",
+      "/detyam/": "Детские выкройки",
+      "/muzhchinam/": "Мужские выкройки"
+    }
   },
   {
     "source": "tailorgirl",
     "display_name": "Рыбчинская",
     "base_url": "https://tailorgirl.net",
-    "catalog_url": "https://tailorgirl.net",
+    "catalog_url": "https://tailorgirl.net/sew-patterns",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "candidate_adapter": "tilda_sitemap",
-    "note": "Один из публичных product URL перенаправляет на другой origin; полный snapshot не подтверждён."
+    "adapter": "tilda_api",
+    "public_api_authorized": true
   },
   {
     "source": "sewlevel",
     "display_name": "SewLevel",
     "base_url": "https://sewlevel.ru",
-    "catalog_url": "https://sewlevel.ru",
+    "catalog_url": "https://sewlevel.ru/store/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "independent_html",
+    "template": "sewlevel",
+    "max_pages": 1200,
+    "robots_allow": [
+      "/(?:vikroyki|vykrojki|store)/[^?]*\\?(?:page|per-page)=.*"
+    ],
+    "section_labels": {
+      "/zhenskie/": "Женские выкройки",
+      "/detskie/": "Детские выкройки",
+      "/muzhskie/": "Мужские выкройки"
+    }
   },
   {
     "source": "latelye",
     "display_name": "Латели",
     "base_url": "https://latelye.ru",
-    "catalog_url": "https://latelye.ru",
+    "catalog_url": "https://latelye.ru/mod-p.php",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "lekala_legacy",
+    "max_pages": 5000
   },
   {
     "source": "onesews",
@@ -368,11 +433,11 @@
     "source": "yasew",
     "display_name": "Я шью",
     "base_url": "https://yasew.ru",
-    "catalog_url": "https://yasew.ru",
+    "catalog_url": "https://yasew.ru/catalog/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "bitrix_catalog"
   },
   {
     "source": "skroila",
@@ -382,7 +447,10 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "woo_store",
+    "robots_allow": [
+      "/wp-json/wc/store/v1/products(?:\\?.*)?"
+    ]
   },
   {
     "source": "kaminskaya_sews",
@@ -402,8 +470,9 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+    "adapter": "wordpress_sitemap",
+    "sitemap_url": "https://selftailor.ru/sitemap_index.xml",
+    "max_pages": 3000
   },
   {
     "source": "sewniverse",
@@ -419,12 +488,11 @@
     "source": "katie_patterns",
     "display_name": "Кейт pattern",
     "base_url": "https://katie-patterns.ru",
-    "catalog_url": "https://katie-patterns.ru",
+    "catalog_url": "https://katie-patterns.ru/shop",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+    "adapter": "vigbo"
   },
   {
     "source": "whitewaterdress",
@@ -454,37 +522,66 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "opencart",
+    "section_labels": {
+      "zhenskie-vykrojki": "Женские выкройки",
+      "muzhskie-vykrojki": "Мужские выкройки",
+      "detskie-vykrojki": "Детские выкройки",
+      "detskaya-odezhda": "Выкройки детской одежды",
+      "muzhskaja-kollekcija": "Мужская коллекция"
+    },
+    "listing_urls": [
+      "/zhenskie-vykrojki",
+      "/muzhskie-vykrojki",
+      "/detskie-vykrojki",
+      "/vykrojki-dlya-sobak"
+    ]
   },
   {
     "source": "wantandsew",
     "display_name": "Хочу и шью",
     "base_url": "https://wantandsew.online",
-    "catalog_url": "https://wantandsew.online",
+    "catalog_url": "https://wantandsew.online/catalog/zhenskie_vykroyki/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "bitrix_catalog",
+    "robots_allow": [
+      "/catalog/[^?]*\\?PAGEN_\\d+=\\d+"
+    ],
+    "bitrix": {
+      "strategy": "listing",
+      "catalog_paths": [
+        "/catalog/zhenskie_vykroyki/",
+        "/catalog/detskie_vykroyki/",
+        "/catalog/muzhskie_vykroyki/",
+        "/catalog/aksessuary/",
+        "/catalog/besplatnye_vykroyki/",
+        "/catalog/bazovye_lekala/",
+        "/catalog/vykroyki_dlya_mladentsev_/"
+      ]
+    }
   },
   {
     "source": "kapsulestore",
     "display_name": "kapsulestore",
     "base_url": "https://kapsulestore.ru",
-    "catalog_url": "https://kapsulestore.ru",
+    "catalog_url": "https://kapsulestore.ru/catalog/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "bitrix_catalog"
   },
   {
     "source": "leko_mail",
     "display_name": "leko mail",
     "base_url": "https://leko-mail.ru",
-    "catalog_url": "https://leko-mail.ru",
+    "catalog_url": "https://leko-mail.ru/mod-p.php",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "lekala_legacy",
+    "max_pages": 5000
   },
   {
     "source": "sew_lane",
@@ -494,17 +591,23 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "wordpress_posts",
+    "max_pages": 1000,
+    "page_size": 50,
+    "crawl_checkpoint": "data/provider_crawls/sew_lane",
+    "robots_allow": [
+      "/wp-json/wp/v2/(?:posts|media)\\?.*"
+    ]
   },
   {
     "source": "vikroy_ka",
     "display_name": "vikroy-ka.ru",
     "base_url": "https://vikroy-ka.ru",
-    "catalog_url": "https://vikroy-ka.ru",
+    "catalog_url": "https://vikroy-ka.ru/pattern/models/",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "bitrix_catalog"
   },
   {
     "source": "mialine",
@@ -564,7 +667,8 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "wordpress_sitemap",
+    "sitemap_url": "https://belenochka.ru/wp-sitemap.xml"
   },
   {
     "source": "lubimchiki_style",
@@ -594,7 +698,7 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "tilda_extended"
   },
   {
     "source": "masterskayakorol",
@@ -604,7 +708,8 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "tilda_api",
+    "public_api_authorized": true
   },
   {
     "source": "andrianova_pattern",
@@ -621,11 +726,11 @@
     "source": "settembre",
     "display_name": "settembre.ru",
     "base_url": "https://settembre.ru",
-    "catalog_url": "https://settembre.ru",
+    "catalog_url": "https://settembre.ru/magazin/vykrojki",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "vigbo"
   },
   {
     "source": "aurorasew",
@@ -655,7 +760,13 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "wordpress_posts",
+    "max_pages": 1000,
+    "page_size": 50,
+    "crawl_checkpoint": "data/provider_crawls/vikroim",
+    "robots_allow": [
+      "/wp-json/wp/v2/(?:posts|media)\\?.*"
+    ]
   },
   {
     "source": "unikroj",
@@ -732,11 +843,13 @@
     "source": "tashamorozova",
     "display_name": "tashamorozova",
     "base_url": "https://tashamorozova.ru",
-    "catalog_url": "https://tashamorozova.ru",
+    "catalog_url": "https://tashamorozova.ru/pattern",
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "tilda_extended",
+    "discovery": "static_catalog",
+    "static_product_pattern": "^/[^/]+_pattern$"
   },
   {
     "source": "all_sew",
@@ -756,7 +869,10 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "tilda_extended",
+    "category_sitemaps": [
+      "/sitemap-store-parts.xml"
+    ]
   },
   {
     "source": "lirapattern",
@@ -776,8 +892,7 @@
     "specialization": "general",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+    "adapter": "marymake"
   },
   {
     "source": "laviedelalingerie_shop",
@@ -797,7 +912,10 @@
     "specialization": "lingerie",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "woo_store",
+    "robots_allow": [
+      "/wp-json/wc/store/v1/products(?:\\?.*)?"
+    ]
   },
   {
     "source": "shvej_shop",
@@ -807,9 +925,10 @@
     "specialization": "lingerie",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "candidate_adapter": "woo_html",
-    "note": "robots.txt запрещает следующую страницу каталога. Полный snapshot не подтверждён."
+    "adapter": "woo_store",
+    "robots_allow": [
+      "/wp-json/wc/store/v1/products(?:\\?.*)?"
+    ]
   },
   {
     "source": "alenakochkareva",
@@ -825,12 +944,12 @@
     "source": "juliastefanello",
     "display_name": "juliastefanello",
     "base_url": "https://juliastefanello.com",
-    "catalog_url": "https://juliastefanello.com",
+    "catalog_url": "https://juliastefanello.com/patterns",
     "specialization": "lingerie",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null,
-    "note": "HTTP-проверка недоступна; ссылка из списка клиента."
+    "adapter": "tilda_api",
+    "public_api_authorized": true
   },
   {
     "source": "perchikpatterns",
@@ -850,27 +969,39 @@
     "specialization": "lingerie",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "opencart",
+    "section_labels": {
+      "zhenskie-vykrojki": "Женские выкройки",
+      "muzhskie-vykrojki": "Мужские выкройки",
+      "detskie-vykrojki": "Детские выкройки",
+      "detskaya-odezhda": "Выкройки детской одежды",
+      "muzhskaja-kollekcija": "Мужская коллекция"
+    },
+    "sitemap_url": "https://lekalolingerie.com/index.php?route=extension/feed/google_sitemap"
   },
   {
     "source": "modety",
     "display_name": "Modety",
     "base_url": "https://modety.ru",
-    "catalog_url": "https://modety.ru",
+    "catalog_url": "https://modety.ru/vikroyki-odezhdy-dlya-detey",
     "specialization": "kids",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "virtuemart",
+    "robots_allow": [
+      "/vikroyki-odezhdy-dlya-detey\\?start=\\d+"
+    ]
   },
   {
     "source": "zheltokbaby",
     "display_name": "Желток",
     "base_url": "https://zheltokbaby.com",
-    "catalog_url": "https://zheltokbaby.com",
+    "catalog_url": "https://zheltokbaby.com/catalog",
     "specialization": "kids",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "tilda_api",
+    "public_api_authorized": true
   },
   {
     "source": "lekalo_kids",
@@ -886,11 +1017,14 @@
     "source": "aspatterns",
     "display_name": "aspatterns",
     "base_url": "https://aspatterns.ru",
-    "catalog_url": "https://aspatterns.ru",
+    "catalog_url": "https://aspatterns.ru/m/",
     "specialization": "kids",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "taplink",
+    "robots_allow": [
+      "/api/market/products/list\\.json\\?collection_id=&next=\\d+&filters%5Bquery%5D="
+    ]
   },
   {
     "source": "lekalo",
@@ -900,7 +1034,15 @@
     "specialization": "kids",
     "enabled": true,
     "verified_on": "2026-10-28",
-    "adapter": null
+    "adapter": "opencart",
+    "section_labels": {
+      "zhenskie-vykrojki": "Женские выкройки",
+      "muzhskie-vykrojki": "Мужские выкройки",
+      "detskie-vykrojki": "Детские выкройки",
+      "detskaya-odezhda": "Выкройки детской одежды",
+      "muzhskaja-kollekcija": "Мужская коллекция"
+    },
+    "sitemap_url": "https://lekalo.online/index.php?route=extension/feed/google_sitemap"
   },
   {
     "source": "kids_patterns",
