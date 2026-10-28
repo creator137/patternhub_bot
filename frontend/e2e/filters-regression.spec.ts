@@ -1,13 +1,18 @@
 import {test,expect} from '@playwright/test';
 test.setTimeout(60000);
-test('all catalog controls are available again',async({page})=>{
+test('catalog controls remain available without the removed age cutoff and technical notice',async({page})=>{
+ await page.addInitScript(()=>sessionStorage.setItem('allsewpattern.filters',JSON.stringify({is_new:true})));
  await page.goto('/');await expect(page.locator('.product-card').first()).toBeVisible();
+ expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('allsewpattern.filters')||'{}').is_new)).toBeNull();
+ await expect(page.getByText(/аудитория пока не определена/)).toHaveCount(0);
+ await expect(page.getByRole('button',{name:/За последние 60 дней/})).toHaveCount(0);
  await expect(page.locator('.audiences button')).toHaveCount(5);
  await expect(page.locator('.toolbar').getByRole('combobox',{name:'Сортировка'})).toBeVisible();
  await page.getByRole('button',{name:/^Фильтры/}).click();
  const drawer=page.locator('.filter-drawer');
  await expect(drawer.getByRole('combobox')).toHaveCount(4);
- for(const label of ['За последние 60 дней','Скидки','Бесплатные и за 1 ₽','Для начинающих','Трикотаж'])
+ await expect(drawer.getByRole('switch')).toHaveCount(4);
+ for(const label of ['Скидки','Бесплатные и за 1 ₽','Для начинающих','Трикотаж'])
   await expect(drawer.locator('.toggle-row').filter({hasText:label}).getByRole('switch')).toBeVisible();
  await page.screenshot({path:'test-results/restored-filters.png'});
 });

@@ -479,18 +479,7 @@ onUnmounted(() => {
             {{ entry.title }} <span aria-hidden="true">×</span>
           </button>
         </div>
-        <p v-if="enabled.includes('audience') && meta?.coverage.unknown_audience" class="muted small" role="note">
-          У {{ meta.coverage.unknown_audience }} выкроек аудитория пока не определена:
-          они доступны в разделе «Все выкройки».
-        </p>
-        <p v-if="filters.is_new" class="muted small" role="note">
-          Опубликованы производителем за последние 60 дней.
-          Даты известны у {{ meta?.coverage.publication_dates || 0 }} из {{ meta?.coverage.total }} выкроек.
-          <button v-if="filters.is_new && enabled.includes('sort')" class="reset" @click="filters.is_new = null; filters.sort = 'new_first'">
-            Весь каталог, сначала новинки
-          </button>
-        </p>
-        <p v-else-if="enabled.includes('sort') && filters.sort === 'new_first'" class="muted small" role="note">
+        <p v-if="enabled.includes('sort') && filters.sort === 'new_first'" class="muted small" role="note">
           {{ filters.source ? 'Все подходящие выкройки — от новых моделей к старым.' : 'Сначала свежие модели каждого бренда.' }}
         </p>
         <p v-if="filters.is_free" class="muted small" role="note">

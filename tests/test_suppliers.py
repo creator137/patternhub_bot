@@ -37,7 +37,7 @@ class SupplierTests(unittest.TestCase):
 
     def test_all_controls_are_restored_and_admin_visibility_is_respected(self):
         meta=self.client.get('/api/meta').json()
-        self.assertEqual({f['key'] for f in meta['ui']['filters'] if f['enabled']},set(FILTERS))
+        self.assertEqual({f['key'] for f in meta['ui']['filters'] if f['enabled']},set(FILTERS)-{'is_new'})
         self.assertEqual({m['key'] for m in meta['ui']['menu'] if m['enabled']},set(MENUS))
         self.assertEqual(meta['supplier_count'],88)
         for item in meta['ui']['filters']:

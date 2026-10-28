@@ -71,7 +71,8 @@ async function changeTab(value: string) {
 }
 function move(list: UIItem[], entry:UIItem) {
   const index=list.indexOf(entry);
-  const previous=index-1;
+  let previous=index-1;
+  while(previous>=0 && list[previous].key==='is_new')previous--;
   if(previous>=0)[list[previous],list[index]]=[list[index],list[previous]];
 }
 function edit(p: Product) {
@@ -187,7 +188,7 @@ onMounted(async () => {
         >
           <h2>{{ group === 'filters' ? 'Фильтры' : 'Разделы по аудитории' }}</h2>
           <div
-            v-for="(entry, index) in ui[group]"
+            v-for="(entry, index) in ui[group].filter(entry=>entry.key!=='is_new')"
             :key="entry.key"
             class="setting-row"
           >

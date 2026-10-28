@@ -62,9 +62,13 @@ class WebCatalogRepository(ProductRepository):
             db.execute("INSERT INTO settings(key,value) VALUES('miniapp.ui',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP", (json.dumps(value),))
 
     def public_settings(self):
-        # Visibility follows the administrator's settings, including optional
-        # source facts. Expanding the directory must not silently hide controls.
-        return self.settings()
+        value = self.settings()
+        # Recency remains a sorting option; the separate 60-day cutoff was
+        # removed from the public UI at the owner's request.
+        for entry in value['filters']:
+            if entry['key'] == 'is_new':
+                entry['enabled'] = False
+        return value
 
     def public_suppliers(self):
         with self.database.connect() as db:
