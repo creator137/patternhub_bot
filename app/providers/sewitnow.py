@@ -403,7 +403,9 @@ class SewItNowProvider(BaseProvider):
         values = []
         def walk(node):
             if isinstance(node, dict):
-                if node.get('slug') == slug:
+                same_id = (str(node.get('id') or '').isdigit()
+                    and slug.rsplit('-',1)[-1] == str(node['id']) and node.get('slug'))
+                if node.get('slug') == slug or same_id:
                     for image in node.get('images') or []:
                         if isinstance(image, dict):
                             values.append((image.get('storage_object') or {}).get('url'))
@@ -414,6 +416,20 @@ class SewItNowProvider(BaseProvider):
                     walk(child)
         walk(data.get('props', {}).get('pageProps', {}))
         return clean_images(values, product_url)
+
+    def parse_filter_metadata(self, html: str, product_url: str) -> dict:
+        from urllib.parse import urlsplit
+        from app.models.filter_facts import description_facts
+        data = self.parse_next_data(html)
+        product = data.get('props', {}).get('pageProps', {}).get('initProduct') or {}
+        requested_slug = urlsplit(product_url).path.rstrip('/').split('/')[-1]
+        same_id = str(product.get('id') or '').isdigit() and requested_slug.rsplit('-',1)[-1] == str(product['id'])
+        if str(product.get('slug')) != requested_slug and not same_id:
+            raise ValueError('SewItNow detail product mismatch')
+        facts = description_facts(str(product.get('description') or ''))
+        if product.get('description'):
+            facts['description'] = BeautifulSoup(product['description'], 'html.parser').get_text(' ', strip=True)
+        return facts
 
     def _parse_product(
         self,

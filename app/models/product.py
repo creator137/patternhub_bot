@@ -49,11 +49,15 @@ def _has_beginner_marker(values: tuple[str | None, ...]) -> bool:
         "простая выкройка",
         "простая модель",
         "простое изделие",
-        "уровень сложности: 1",
-        "сложность: 1",
-        "difficulty: 1",
     )
-    return any(marker in text for marker in markers)
+    for sentence in re.split(r'[.!?\n]', text):
+        if re.search(r'не\s+(?:подход\w*|предназнач\w*|рекоменд\w*)[^.!?]{0,60}(?:начинающ|нович)', sentence):
+            continue
+        if any(marker in sentence for marker in markers) or re.search(
+            r'(?:уровень сложности|сложность|difficulty)\s*:\s*1\b', sentence
+        ):
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,8 +76,9 @@ class ParsedProduct:
     is_sale: bool = False
     is_free: bool = False
     is_new: bool = False
-    is_beginner: bool = False
-    is_knit: bool = False
+    # None means the listing did not provide this fact; do not erase enrichment.
+    is_beginner: bool | None = None
+    is_knit: bool | None = None
     sizes: tuple[str, ...] | None = None
     heights: tuple[str, ...] | None = None
     difficulty: str | None = None
@@ -101,10 +106,10 @@ class ParsedProduct:
         category = normalize_category(self.category)
         difficulty = _clean_text(self.difficulty)
         description = _clean_text(self.description)
-        is_beginner = self.is_beginner or _has_beginner_marker(
+        is_beginner = True if _has_beginner_marker(
             (difficulty, description, name, subcategory)
-        )
-        is_knit = self.is_knit or _has_text_marker((subcategory,), ("трикотаж",))
+        ) else self.is_beginner
+        is_knit = True if _has_text_marker((subcategory,), ("трикотаж",)) else self.is_knit
         images = tuple(dict.fromkeys(_clean_url(url) for url in self.image_urls or () if url))
         return replace(
             self,

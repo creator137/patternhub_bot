@@ -63,6 +63,7 @@ try {
 } catch { /* browsing remains available without storage */ }
 let listRequest: AbortController | null = null;
 const sortOptions = [
+  { label: "Сначала новинки", value: "new_first" },
   { label: "По названию", value: "name" },
   { label: "Сначала дешевле", value: "price_asc" },
   { label: "Сначала дороже", value: "price_desc" },
@@ -470,6 +471,9 @@ onUnmounted(() => {
         </p>
         <p v-if="filters.is_new" class="muted small" role="note">
           Только подтверждённые новинки. Не все источники передают этот признак.
+          <button v-if="enabled.includes('sort')" class="reset" @click="filters.is_new = null; filters.sort = 'new_first'">
+            Весь каталог, сначала новинки
+          </button>
         </p>
         <div v-if="error" class="empty" role="alert">
           <h2>Каталог временно недоступен</h2>

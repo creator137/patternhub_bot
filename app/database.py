@@ -80,6 +80,11 @@ class Database:
             self._ensure_column(connection, "products", "image_status", "TEXT")
             self._ensure_column(connection, "products", "image_urls", "TEXT")
             self._ensure_column(connection, "products", "gallery_checked_at", "TEXT")
+            self._ensure_column(connection, "products", "filters_checked_at", "TEXT")
+            connection.execute('''CREATE TABLE IF NOT EXISTS source_filter_snapshots (
+                source TEXT NOT NULL REFERENCES sources(name), field TEXT NOT NULL,
+                checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(source,field))''')
             connection.executescript("""CREATE TABLE IF NOT EXISTS media_assets (
                 key TEXT PRIMARY KEY, url TEXT NOT NULL, referer TEXT,
                 state TEXT NOT NULL DEFAULT 'pending', priority INTEGER NOT NULL DEFAULT 100,

@@ -192,6 +192,8 @@ class StudioYusupovaProvider(BaseProvider):
         category_names = self._category_names(item, category_index)
         price, old_price = self._prices(item.get("prices") or {})
         sizes, heights = self._attributes(item.get("attributes") or [])
+        from app.models.filter_facts import description_facts
+        facts = description_facts(str(item.get('description') or ''))
 
         return ParsedProduct(
             source=self.source,
@@ -207,6 +209,9 @@ class StudioYusupovaProvider(BaseProvider):
             is_sale=bool(item.get("on_sale")),
             is_free=price == Decimal("0.00"),
             is_new=False,
+            is_beginner=facts.get('is_beginner'),
+            is_knit='Трикотаж' in category_names or facts.get('is_knit'),
+            difficulty=facts.get('difficulty'),
             sizes=sizes,
             heights=heights,
             description=self._description(item),

@@ -46,6 +46,10 @@ class CatalogService:
             self.repository.upsert_many, result.products
         )
         await asyncio.to_thread(MediaRepository(self.repository.database).register_products, result.products)
+        for field, snapshot in (await provider.fetch_filter_snapshots()).items():
+            await asyncio.to_thread(self.repository.apply_filter_snapshot, provider.source, field, snapshot)
+            logger.info('Filter snapshot source=%s field=%s found=%s complete=%s',
+                provider.source, field, len(snapshot.products), snapshot.complete)
         unavailable = 0
         if result.complete and result.errors == 0:
             unavailable = await asyncio.to_thread(

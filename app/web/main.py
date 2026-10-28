@@ -32,7 +32,7 @@ class CatalogQuery(BaseModel):
     is_free: bool | None = None
     is_beginner: bool | None = None
     is_knit: bool | None = None
-    sort: Literal["name", "price_asc", "price_desc"] = "name"
+    sort: Literal["name", "new_first", "price_asc", "price_desc"] = "name"
     ids: str | None = Field(None, max_length=6000, pattern=r"^[0-9]{1,12}(,[0-9]{1,12}){0,499}$")
 
 

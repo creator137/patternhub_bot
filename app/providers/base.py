@@ -16,8 +16,21 @@ class ProviderResult:
     complete: bool = True
 
 
+@dataclass(frozen=True)
+class FilterSnapshot:
+    products: list[ParsedProduct]
+    complete: bool
+
+
 class BaseProvider(ABC):
     source: str
+
+    async def fetch_filter_snapshots(self) -> dict[str, FilterSnapshot]:
+        return {}
+
+    def parse_filter_metadata(self, html: str, product_url: str) -> dict:
+        """Only authoritative detail facts; omitted fields remain unchanged."""
+        return {}
 
     def parse_gallery(self, html: str, product_url: str) -> tuple[str, ...]:
         from app.providers.gallery import html_gallery

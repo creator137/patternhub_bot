@@ -48,7 +48,16 @@ async def prepare(*, mode='covers', source=None, product_id=None, limit=10000):
                                     raise
                                 import random
                                 await asyncio.sleep(max(pause, 2 ** attempt * random.uniform(.8,1.2)))
-                        found = create_provider(product.source).parse_gallery(response.text, product.product_url)
+                        provider = create_provider(product.source)
+                        facts = provider.parse_filter_metadata(response.text, product.product_url)
+                        await asyncio.to_thread(repo.set_filter_metadata, product.id, facts, expected_url=product.product_url)
+                        if mode == 'filters':
+                            stats['galleries'] += 1
+                            stats['processed'] += 1
+                            if stats['processed'] % 25 == 0:
+                                logging.info('Filter enrichment progress: %s', stats)
+                            return
+                        found = provider.parse_gallery(response.text, product.product_url)
                         if not found:
                             raise ValueError('Product gallery markup missing')
                         if found:
@@ -117,8 +126,9 @@ async def prepare(*, mode='covers', source=None, product_id=None, limit=10000):
                     if affected and all(entry['url'] not in ((p.image_url,) + tuple(p.image_urls or ()))
                             for p in (repo.get_product(product.id) for product in affected) if p):
                         await asyncio.to_thread(media_repo.obsolete, entry['key'])
-        if mode in {'galleries', 'all'}:
-            products = repo.media_products(product_id=product_id, source=source, galleries=True, limit=limit)
+        if mode in {'galleries', 'filters', 'all'}:
+            products = repo.media_products(product_id=product_id, source=source, galleries=True,
+                filters_only=mode == 'filters', limit=limit)
             await asyncio.gather(*(run(product, gallery=True) for product in products))
     await asyncio.to_thread(cache.prune, max_bytes=int(os.getenv('MEDIA_CACHE_MAX_MB', '768')) * 1024 * 1024)
     await cache.aclose()
@@ -129,7 +139,7 @@ async def prepare(*, mode='covers', source=None, product_id=None, limit=10000):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', choices=('register', 'covers', 'galleries', 'queue', 'all'), default='covers')
+    parser.add_argument('--mode', choices=('register', 'covers', 'galleries', 'filters', 'queue', 'all'), default='covers')
     parser.add_argument('--source')
     parser.add_argument('--product-id', type=int)
     parser.add_argument('--limit', type=int, default=10000)

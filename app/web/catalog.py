@@ -12,6 +12,7 @@ from app.services.images import photo_urls
 FILTERS = ("search", "category", "source", "audience", "is_new", "is_sale", "is_free", "is_beginner", "is_knit", "sort")
 MENUS = ("women", "men", "kids", "unisex")
 SORTS = {"name": "p.name, p.id", "price_asc": "p.price IS NULL, CAST(p.price AS REAL), p.id",
+         "new_first": "p.is_new DESC, p.name, p.id",
          "price_desc": "p.price IS NULL, CAST(p.price AS REAL) DESC, p.id"}
 
 

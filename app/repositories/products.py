@@ -4,6 +4,7 @@ import json
 import sqlite3
 import time
 import random
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Iterable
@@ -30,10 +31,19 @@ class ProductRepository:
         updated = 0
         with self.database.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            authoritative = {(r['source'], r['field']) for r in connection.execute(
+                "SELECT source,field FROM source_filter_snapshots WHERE checked_at>=datetime('now','-1 day')")}
             for raw_product in products:
                 product = raw_product.normalized()
                 existing_id = self._find_existing_id(connection, product)
                 values = self._values(product)
+                if existing_id is not None:
+                    for field in ('is_beginner', 'is_knit', 'sizes', 'heights', 'difficulty', 'description'):
+                        if getattr(product, field) is None:
+                            values.pop(field, None)
+                    for field in ('is_beginner', 'is_knit', 'is_new'):
+                        if values.get(field) == 0 and (product.source, field) in authoritative:
+                            values.pop(field, None)
                 if product.image_urls:
                     values["image_urls"] = json.dumps(product.image_urls, ensure_ascii=False)
                     values['gallery_checked_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
@@ -176,19 +186,67 @@ class ProductRepository:
                 'ON CONFLICT(product_id) DO UPDATE SET attempts=excluded.attempts,next_attempt=excluded.next_attempt,last_error=excluded.last_error',
                 (product_id, attempts, deadline, error[:100]))
 
+    def set_filter_metadata(self, product_id: int, facts: dict, *, expected_url: str):
+        allowed = {'is_beginner', 'is_knit', 'difficulty', 'description'}
+        if set(facts) - allowed:
+            raise ValueError('Unsupported detail fact')
+        values = {key: int(value) if key.startswith('is_') else value
+                  for key, value in facts.items() if value is not None}
+        with self.database.connect() as db:
+            # A current, complete source section outranks absence of a tag on a
+            # detail page. Positive detail evidence can still extend coverage.
+            authoritative = {r[0] for r in db.execute('''SELECT f.field FROM source_filter_snapshots f
+                JOIN products p ON p.source=f.source WHERE p.id=?
+                AND f.checked_at>=datetime('now','-1 day')''', (product_id,))}
+            values = {key:value for key,value in values.items() if key not in authoritative or value != 0}
+            assignments = [f'{key}=?' for key in values]
+            assignments.append('filters_checked_at=CURRENT_TIMESTAMP')
+            db.execute(f"UPDATE products SET {','.join(assignments)} WHERE id=? AND product_url=?",
+                       (*values.values(), product_id, expected_url))
+
+    def apply_filter_snapshot(self, source: str, field: str, snapshot) -> int:
+        if field not in {'is_beginner','is_knit','is_new'}:
+            raise ValueError('Unsupported membership filter')
+        if not snapshot.products:
+            return 0  # Empty/blocked pages must never clear existing facts.
+        if any(p.source.casefold() != source.casefold() for p in snapshot.products):
+            raise ValueError('Filter snapshot contains another source')
+        with self.database.connect() as db:
+            db.execute('CREATE TEMP TABLE filter_keys (source_id TEXT, url TEXT)')
+            db.executemany('INSERT INTO filter_keys VALUES (?,?)',
+                [(p.source_product_id,p.product_url) for p in snapshot.products])
+            previous = db.execute(f'SELECT COUNT(*) FROM products WHERE source=? AND {field}=1', (source,)).fetchone()[0]
+            matched = db.execute('''SELECT COUNT(*) FROM products WHERE source=? AND EXISTS (
+                SELECT 1 FROM filter_keys k WHERE k.source_id=products.source_product_id OR k.url=products.product_url)''', (source,)).fetchone()[0]
+            safe_complete = snapshot.complete and not (previous > 20 and matched < previous / 2)
+            logging.info('Filter membership source=%s field=%s found=%s matched=%s complete=%s',
+                source,field,len(snapshot.products),matched,safe_complete)
+            if snapshot.complete and not safe_complete:
+                logging.warning('Refusing to clear filter source=%s field=%s previous=%s matched=%s', source,field,previous,matched)
+            fallback = '0' if safe_complete else field
+            changed = db.execute(f'''UPDATE products SET {field}=CASE WHEN EXISTS (
+                SELECT 1 FROM filter_keys k WHERE k.source_id=products.source_product_id OR k.url=products.product_url)
+                THEN 1 ELSE {fallback} END WHERE source=?''', (source,)).rowcount
+            if safe_complete:
+                db.execute('''INSERT INTO source_filter_snapshots(source,field) VALUES(?,?)
+                    ON CONFLICT(source,field) DO UPDATE SET checked_at=CURRENT_TIMESTAMP''', (source,field))
+            db.execute('DROP TABLE filter_keys')
+        return changed
+
     def media_products(self, *, product_id: int | None = None, source: str | None = None,
-                       galleries: bool = False, limit: int = 10000) -> list[Product]:
+                       galleries: bool = False, filters_only: bool = False, limit: int = 10000) -> list[Product]:
         clauses = ["p.is_available=1", "s.enabled=1"]
         values: list[object] = []
         for key, value in (("id", product_id), ("source", source)):
             if value is not None:
                 clauses.append(f"p.{key}=?")
                 values.append(value)
-        if galleries and product_id is None:
-            clauses.append("(p.gallery_checked_at IS NULL OR p.gallery_checked_at < datetime('now','-1 day'))")
+        if (galleries or filters_only) and product_id is None:
+            clauses.append("(p.filters_checked_at IS NULL OR p.filters_checked_at < datetime('now','-7 day'))" if filters_only else
+                "(p.filters_checked_at IS NULL OR p.filters_checked_at < datetime('now','-7 day') OR p.gallery_checked_at IS NULL OR p.gallery_checked_at < datetime('now','-1 day'))")
             clauses.append("NOT EXISTS (SELECT 1 FROM media_gallery_jobs j WHERE j.product_id=p.id AND j.next_attempt>?)")
             values.append(time.time())
-        order = ('ROW_NUMBER() OVER (PARTITION BY p.source ORDER BY p.gallery_checked_at IS NOT NULL,p.name,p.id),p.source'
+        order = ('ROW_NUMBER() OVER (PARTITION BY p.source ORDER BY p.filters_checked_at IS NOT NULL,p.gallery_checked_at IS NOT NULL,p.name,p.id),p.source'
                  if galleries else 'p.name,p.id')
         with self.database.connect() as db:
             rows = db.execute(f"""SELECT p.* FROM products p JOIN sources s ON s.name=p.source
@@ -455,8 +513,8 @@ class ProductRepository:
             "is_sale": int(product.is_sale),
             "is_free": int(product.is_free),
             "is_new": int(product.is_new),
-            "is_beginner": int(product.is_beginner),
-            "is_knit": int(product.is_knit),
+            "is_beginner": int(bool(product.is_beginner)),
+            "is_knit": int(bool(product.is_knit)),
             "sizes": json.dumps(product.sizes, ensure_ascii=False) if product.sizes else None,
             "heights": json.dumps(product.heights, ensure_ascii=False) if product.heights else None,
             "difficulty": product.difficulty,

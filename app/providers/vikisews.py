@@ -14,7 +14,7 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 
 from app.models.product import ParsedProduct, Product
-from app.providers.base import BaseProvider, ProviderResult
+from app.providers.base import BaseProvider, ProviderResult, FilterSnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,30 @@ class VikiSewsProvider(BaseProvider):
                     products_by_key[product.source_product_id or product.product_url] = product
 
         return ProviderResult(list(products_by_key.values()), errors, complete=errors == 0)
+
+    async def fetch_filter_snapshots(self) -> dict[str, FilterSnapshot]:
+        snapshots = {}
+        async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout, connect=15), follow_redirects=True,
+                trust_env=False, cookies={'django_language':'ru'}) as client:
+            for field, slug in (('is_beginner','dlja-novichkov'), ('is_knit','trikotazh')):
+                products, seen, complete = [], set(), False
+                for page in range(1, self.max_pages + 1):
+                    url = f'{self.base_url}/vykrojki/{slug}/' + (f'?page={page}' if page > 1 else '')
+                    html = await self._get_page(client, url)
+                    if html is None:
+                        break
+                    parsed = self.parse_catalog_page(html, url)
+                    keys = {p.source_product_id or p.product_url for p in parsed}
+                    if not keys or keys <= seen:
+                        break
+                    products.extend(p for p in parsed if (p.source_product_id or p.product_url) not in seen)
+                    seen.update(keys)
+                    logging.info('VikiSews filter %s page=%s products=%s',field,page,len(products))
+                    if not self.has_next_page(html):
+                        complete = True
+                        break
+                snapshots[field] = FilterSnapshot(products, complete)
+        return snapshots
 
     async def enrich_products(self, products: Iterable[Product]) -> ProviderResult:
         seed_products = [self._seed_from_product(product) for product in products]
@@ -301,6 +325,23 @@ class VikiSewsProvider(BaseProvider):
         from app.providers.gallery import html_gallery
         return html_gallery(html, product_url, '.product-view .product-slide img')
 
+    def parse_filter_metadata(self, html: str, product_url: str) -> dict:
+        soup = BeautifulSoup(html, 'html.parser')
+        if not soup.select_one('.product-main-header'):
+            raise ValueError('VikiSews product markup missing')
+        tags = self._detail_tags(soup)
+        materials = self._recommended_materials_text(soup)
+        facts = {}
+        if materials or any('трикотаж' in tag.casefold() for tag in tags):
+            facts['is_knit'] = self._is_knit_product(materials, tags)
+        if tags:
+            levels = {t.casefold() for t in tags}
+            if levels & {'новичок', 'для начинающих', 'начальный уровень'}:
+                facts['is_beginner'] = True
+            elif levels & {'профессионал', 'продвинутый', 'средний уровень', 'уверенный пользователь'}:
+                facts['is_beginner'] = False
+        return facts
+
     def parse_product_page(
         self, html: str, product_url: str, seed: ParsedProduct | None = None
     ) -> ParsedProduct:
@@ -338,6 +379,7 @@ class VikiSewsProvider(BaseProvider):
         materials_text = self._recommended_materials_text(soup)
         detail_tags = self._detail_tags(soup)
         is_knit = self._is_knit_product(materials_text, detail_tags)
+        beginner = any(tag.casefold() in {'новичок', 'для начинающих', 'начальный уровень'} for tag in detail_tags)
 
         base = seed or ParsedProduct(
             source=self.source,
@@ -361,7 +403,7 @@ class VikiSewsProvider(BaseProvider):
             is_sale=base.is_sale,
             is_free=base.is_free,
             is_new=base.is_new,
-            is_beginner=base.is_beginner,
+            is_beginner=beginner if detail_tags else base.is_beginner,
             is_knit=is_knit,
             sizes=sizes or base.sizes,
             heights=heights or base.heights,
