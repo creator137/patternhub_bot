@@ -82,6 +82,12 @@ class Database:
             self._ensure_column(connection, "products", "gallery_checked_at", "TEXT")
             self._ensure_column(connection, "products", "filters_checked_at", "TEXT")
             self._ensure_column(connection, "products", "source_published_at", "TEXT")
+            self._ensure_column(connection, "products", "source_recency_rank", "INTEGER")
+            self._ensure_column(connection, "products", "source_recency_basis", "TEXT")
+            connection.execute('CREATE INDEX IF NOT EXISTS idx_products_recency ON products(source,source_recency_rank)')
+            connection.execute('''CREATE TABLE IF NOT EXISTS source_recency_snapshots (
+                source TEXT PRIMARY KEY REFERENCES sources(name), basis TEXT NOT NULL,
+                products INTEGER NOT NULL, checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)''')
             connection.execute('SAVEPOINT publication_badges')
             try:
                 if self._ensure_column(connection, 'products', 'source_new_badge', 'INTEGER NOT NULL DEFAULT 0'):

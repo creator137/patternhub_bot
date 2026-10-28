@@ -54,7 +54,7 @@ const filters = reactive<Record<string, string | boolean | null>>({
   is_free: null,
   is_beginner: null,
   is_knit: null,
-  sort: "name",
+  sort: "new_first",
 });
 try {
   const stored = JSON.parse(sessionStorage.getItem('allsewpattern.filters') || '{}');
@@ -63,7 +63,7 @@ try {
 } catch { /* browsing remains available without storage */ }
 let listRequest: AbortController | null = null;
 const sortOptions = [
-  { label: "Сначала новинки (60 дней)", value: "new_first" },
+  { label: "От новых к старым", value: "new_first" },
   { label: "По названию", value: "name" },
   { label: "Сначала дешевле", value: "price_asc" },
   { label: "Сначала дороже", value: "price_desc" },
@@ -123,7 +123,7 @@ async function refreshMeta() {
       filters[key] = key === "sort" ? "name" : null;
 }
 function reset() {
-  for (const key in filters) filters[key] = key === "sort" ? "name" : null;
+  for (const key in filters) filters[key] = key === "sort" ? "new_first" : null;
 }
 function toggle(key: string) {
   filters[key] = filters[key] ? null : true;
@@ -410,7 +410,7 @@ onUnmounted(() => {
           /><Select
             v-if="enabled.includes('sort')"
             v-model="filters.sort"
-            class="desktop"
+            class="catalog-sort"
             :options="sortOptions"
             optionLabel="label"
             optionValue="value"
@@ -470,12 +470,15 @@ onUnmounted(() => {
           У {{ meta.coverage.unknown_audience }} выкроек аудитория пока не определена:
           они доступны в разделе «Все выкройки».
         </p>
-        <p v-if="filters.is_new || filters.sort === 'new_first'" class="muted small" role="note">
-          {{ filters.is_new ? 'Опубликованы производителем за последние 60 дней.' : 'Подтверждённые новинки — в начале, остальные — по названию.' }}
+        <p v-if="filters.is_new" class="muted small" role="note">
+          Опубликованы производителем за последние 60 дней.
           Даты известны у {{ meta?.coverage.publication_dates || 0 }} из {{ meta?.coverage.total }} выкроек.
           <button v-if="filters.is_new && enabled.includes('sort')" class="reset" @click="filters.is_new = null; filters.sort = 'new_first'">
             Весь каталог, сначала новинки
           </button>
+        </p>
+        <p v-else-if="filters.sort === 'new_first'" class="muted small" role="note">
+          {{ filters.source ? 'Все подходящие выкройки — от новых моделей к старым.' : 'Сначала свежие модели каждого бренда.' }}
         </p>
         <p v-if="filters.is_free" class="muted small" role="note">
           Бесплатные выкройки и модели за 1 ₽. В карточке указана реальная цена производителя.
@@ -588,7 +591,8 @@ onUnmounted(() => {
             v-model="filters.sort"
             :options="sortOptions"
             optionLabel="label"
-            optionValue="value" /></label
+            optionValue="value"
+            aria-label="Сортировка" /></label
         ><label v-else-if="key.startsWith('is_')" class="toggle-row"
           ><span>{{ labels[key] }}</span
           ><ToggleSwitch

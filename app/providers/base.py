@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from app.models.product import ParsedProduct
+from app.models.recency import RecencySnapshot, product_order_key
+from app.models.catalog_policy import publication_datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +26,17 @@ class FilterSnapshot:
 
 class BaseProvider(ABC):
     source: str
+    recency_basis = "source_publication_date"
+
+    async def fetch_recency_snapshot(self, products) -> RecencySnapshot:
+        """Use real source dates for the whole catalog, with no age cutoff."""
+        products = list(products)
+        dated = [(publication_datetime(p.source_published_at), p) for p in products]
+        complete = bool(dated) and all(date is not None for date, _ in dated)
+        ordered = sorted(((date, p) for date, p in dated if date is not None),
+                         key=lambda pair: (pair[0], product_order_key(pair[1])), reverse=True)
+        return RecencySnapshot.from_products(self.source, (p for _, p in ordered),
+                                            basis=self.recency_basis, complete=complete)
 
     def publication_key(self, product) -> str:
         return str(product.source_product_id or '')

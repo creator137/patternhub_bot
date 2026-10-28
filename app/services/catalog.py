@@ -37,6 +37,14 @@ class CatalogService:
     def __init__(self, repository: ProductRepository) -> None:
         self.repository = repository
 
+    async def refresh_recency(self, provider: BaseProvider):
+        filters = ProductFilter(source=provider.source)
+        products = await self.get_products(limit=await self.count_products(filters), filters=filters)
+        snapshot = await provider.fetch_recency_snapshot(products)
+        updated = await asyncio.to_thread(self.repository.apply_recency_snapshot, provider.source, snapshot)
+        return {'source': provider.source, 'products': len(products), 'ranked': updated,
+                'complete': snapshot.complete, 'basis': snapshot.basis}
+
     async def enrich_publications(self, provider: BaseProvider):
         filters = ProductFilter(source=provider.source)
         products = await self.get_products(limit=await self.count_products(filters),filters=filters)
@@ -81,6 +89,12 @@ class CatalogService:
                 source_product_ids=result.skipped_product_ids,
                 product_urls=result.skipped_product_urls,
             )
+        if result.complete and not result.errors:
+            try:
+                logger.info('Recency order: %s', await self.refresh_recency(provider))
+            except Exception as error:
+                # Keep the last good order when an optional ordering feed fails.
+                logger.warning('Recency refresh failed source=%s error=%s', provider.source, type(error).__name__)
         stats = SyncStats(
             source=provider.source,
             found=len(result.products),

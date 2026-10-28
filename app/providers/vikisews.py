@@ -8,13 +8,14 @@ from collections.abc import Iterable
 from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from time import monotonic
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from bs4 import BeautifulSoup, Tag
 
 from app.models.product import ParsedProduct, Product
 from app.providers.base import BaseProvider, ProviderResult, FilterSnapshot
+from app.models.recency import RecencySnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,42 @@ class VikiSewsProvider(BaseProvider):
         self.enrich_details = enrich_details
         self.detail_limit = detail_limit
         self._last_request_started: float | None = None
+        self._recency_snapshot = None
+
+    async def fetch_recency_snapshot(self, products):
+        if self._recency_snapshot is not None:
+            return self._recency_snapshot
+        ordered, seen, visited = [], set(), set()
+        complete = False
+        url = self.catalog_url
+        async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout, connect=15),
+                follow_redirects=True, trust_env=False, cookies={'django_language':'ru'}) as client:
+            for _ in range(self.max_pages):
+                if url in visited:
+                    break
+                visited.add(url)
+                html = await self._get_page(client, url)
+                if html is None:
+                    break
+                parsed = self.parse_catalog_page(html, url)
+                keys = {p.source_product_id or p.product_url for p in parsed}
+                if not keys or keys <= seen:
+                    break
+                ordered.extend(p for p in parsed if (p.source_product_id or p.product_url) not in seen)
+                seen.update(keys)
+                logger.info('VikiSews recency page=%s products=%s', len(visited), len(ordered))
+                more = BeautifulSoup(html, 'html.parser').select_one('#infinite-upload-more[data-link]')
+                if more is None:
+                    complete = True
+                    break
+                next_url = urljoin(url, str(more.get('data-link') or ''))
+                parts, origin = urlsplit(next_url), urlsplit(self.catalog_url)
+                if parts.hostname != origin.hostname or parts.path != origin.path or parts.scheme != 'https':
+                    break
+                url = next_url
+        self._recency_snapshot = RecencySnapshot.from_products(self.source, ordered,
+            basis='source_catalog_order', complete=complete)
+        return self._recency_snapshot
 
     async def fetch_products(self) -> ProviderResult:
         products_by_key: dict[str, ParsedProduct] = {}
@@ -111,6 +148,7 @@ class VikiSewsProvider(BaseProvider):
                     new_count,
                 )
                 if not page_products or new_count == 0:
+                    errors += 1
                     break
                 if not self.has_next_page(html):
                     logger.info("VikiSews catalog ended on page %d", page_number)
@@ -128,6 +166,8 @@ class VikiSewsProvider(BaseProvider):
                 for product in enriched_result.products:
                     products_by_key[product.source_product_id or product.product_url] = product
 
+        self._recency_snapshot = RecencySnapshot.from_products(self.source, products_by_key.values(),
+            basis='source_catalog_order', complete=errors == 0)
         return ProviderResult(list(products_by_key.values()), errors, complete=errors == 0)
 
     async def fetch_filter_snapshots(self) -> dict[str, FilterSnapshot]:

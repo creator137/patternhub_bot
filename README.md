@@ -212,3 +212,4 @@ Mini App использует локальные WebP-превью и галер
 
 Разметка и проверка фильтров: [FILTER_AUDIT.md](docs/FILTER_AUDIT.md).
 Правило 60 дней и раздел с позициями за 1 ₽: [PUBLICATION_POLICY.md](docs/PUBLICATION_POLICY.md).
+Сортировка всех моделей от новых к старым: [RECENCY_SORT.md](docs/RECENCY_SORT.md).

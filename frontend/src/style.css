@@ -744,6 +744,13 @@ footer .logo {
   .desktop {
     display: none !important;
   }
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .toolbar > .catalog-sort {
+    flex-basis: 100%;
+    width: 100%;
+  }
   .detail {
     gap: 30px;
   }

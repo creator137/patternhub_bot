@@ -13,7 +13,10 @@ from app.models.catalog_policy import free_section_sql, new_section_sql, NEW_WIN
 FILTERS = ("search", "category", "source", "audience", "is_new", "is_sale", "is_free", "is_beginner", "is_knit", "sort")
 MENUS = ("women", "men", "kids", "unisex")
 SORTS = {"name": "p.name, p.id", "price_asc": "p.price IS NULL, CAST(p.price AS REAL), p.id",
-         "new_first": f"{new_section_sql('p.')} DESC, CASE WHEN {new_section_sql('p.')} THEN julianday(p.source_published_at) END DESC, p.name, p.id",
+         "new_first": ("p.source_recency_rank IS NULL, p.source_recency_rank, "
+                       f"{new_section_sql('p.')} DESC, "
+                       f"CASE WHEN p.source_recency_rank IS NULL AND {new_section_sql('p.')} THEN julianday(p.source_published_at) END DESC, "
+                       "p.source, p.name, p.id"),
          "price_desc": "p.price IS NULL, CAST(p.price AS REAL) DESC, p.id"}
 
 
@@ -121,8 +124,10 @@ class WebCatalogRepository(ProductRepository):
             row = db.execute(f"""SELECT COUNT(*) AS total,
                 COALESCE(SUM(p.audience IS NULL OR p.audience=''),0) AS unknown,
                 COALESCE(SUM(p.source_published_at IS NOT NULL),0) AS dated,
+                COALESCE(SUM(p.source_recency_rank IS NOT NULL),0) AS ranked,
                 {','.join(aggregates)} FROM products p JOIN sources s ON s.name=p.source
                 LEFT JOIN product_overrides o ON o.product_id=p.id
                 WHERE p.is_available=1 AND s.enabled=1 AND COALESCE(o.hidden,0)=0""", MENUS).fetchone()
         return {'counts': {key: int(row[key]) for key in keys}, 'unknown_audience': row['unknown'], 'total': row['total'],
-                'publication_dates': row['dated'], 'new_window_days': NEW_WINDOW_DAYS}
+                'publication_dates': row['dated'], 'new_window_days': NEW_WINDOW_DAYS,
+                'recency_ordered': row['ranked']}

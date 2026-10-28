@@ -39,6 +39,7 @@ class SewItNowProvider(BaseProvider):
     source = "sewitnow"
     base_url = "https://sewitnow.ru"
     brand = "SewItNow"
+    recency_basis = "source_added_date"
     api_url = 'https://api.sewitnow.ru/'
 
     _category_overrides = {

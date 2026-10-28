@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup, Tag
 
 from app.models.product import ParsedProduct
 from app.providers.base import BaseProvider, ProviderResult
+from app.models.recency import RecencySnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 class HelperSewProvider(BaseProvider):
     source = "helpersew"
     base_url = "https://helpersew.com"
+
+    async def fetch_recency_snapshot(self, products):
+        # The site's own "Новые выкройки" explicitly sorts ID descending.
+        products = list(products)
+        valid = all(str(p.source_product_id or '').isdigit() for p in products)
+        ordered = sorted(products, key=lambda p: int(p.source_product_id or 0), reverse=True) if valid else []
+        return RecencySnapshot.from_products(self.source, ordered,
+            basis='source_id_desc', complete=bool(products) and valid)
 
     category_pages: tuple[
         tuple[str, str, str | None] | tuple[str, str, str | None, bool, bool],

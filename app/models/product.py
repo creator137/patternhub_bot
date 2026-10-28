@@ -178,6 +178,8 @@ class Product:
     image_urls: tuple[str, ...] | None = None
     source_published_at: datetime | None = None
     source_new_badge: bool = False
+    source_recency_rank: int | None = None
+    source_recency_basis: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

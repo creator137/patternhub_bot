@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test';
 test('audience navigation clears previous quick filters instead of opening an empty intersection',async({page})=>{
   await page.goto('/');
   await expect(page.locator('.product-card').first()).toBeVisible();
-  for(const [quick,audience,label] of [['Новинки','men','Мужские'],['Бесплатные','unisex','Унисекс']]){
+  for(const [quick,audience,label] of [['За последние 60 дней','men','Мужские'],['Бесплатные','unisex','Унисекс']]){
     await page.locator('.quick').getByRole('button',{name:new RegExp(quick)}).click();
     await expect(page.getByRole('button',{name:new RegExp('^Убрать фильтр: '+quick)})).toBeVisible();
     const response=page.waitForResponse(r=>r.url().includes('/api/products?')&&new URL(r.url()).searchParams.get('audience')===audience);

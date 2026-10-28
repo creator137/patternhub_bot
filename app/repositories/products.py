@@ -21,11 +21,40 @@ from app.models.product import (
     ProductFilter,
 )
 from app.models.catalog_policy import free_section_sql, new_section_sql, is_recent_publication, publication_datetime
+from app.models.recency import RecencySnapshot
 
 
 class ProductRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
+
+    def apply_recency_snapshot(self, source: str, snapshot: RecencySnapshot) -> int:
+        if snapshot.source != source:
+            raise ValueError('Recency snapshot contains another source')
+        if not snapshot.complete or not snapshot.keys or not snapshot.basis:
+            return 0
+        if len(set(snapshot.keys)) != len(snapshot.keys):
+            raise ValueError('Duplicate recency keys')
+        with self.database.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            rows = db.execute('''SELECT id,COALESCE(source_product_id,product_url) AS key
+                FROM products WHERE source=? AND is_available=1''', (source,)).fetchall()
+            by_key = {r['key']: r['id'] for r in rows}
+            matched = set(snapshot.keys) & by_key.keys()
+            # Even a provider claiming completeness must not replace a full
+            # ordering with a truncated/blocked page after a markup change.
+            if not rows or len(matched) < len(rows) * .9:
+                logging.warning('Rejected recency snapshot source=%s matched=%s available=%s',
+                                source, len(matched), len(rows))
+                return 0
+            db.execute('UPDATE products SET source_recency_rank=NULL,source_recency_basis=NULL WHERE source=?', (source,))
+            db.executemany('UPDATE products SET source_recency_rank=?,source_recency_basis=? WHERE id=? AND source=?',
+                [(rank, snapshot.basis, by_key[key], source)
+                 for rank, key in enumerate(snapshot.keys) if key in by_key])
+            db.execute('''INSERT INTO source_recency_snapshots(source,basis,products) VALUES(?,?,?)
+                ON CONFLICT(source) DO UPDATE SET basis=excluded.basis,products=excluded.products,
+                checked_at=CURRENT_TIMESTAMP''', (source, snapshot.basis, len(matched)))
+        return len(matched)
 
     def upsert_many(self, products: Iterable[ParsedProduct]) -> tuple[int, int]:
         added = 0
@@ -572,6 +601,8 @@ class ProductRepository:
             is_new=is_recent_publication(row['source_published_at']),
             source_new_badge=bool(row['source_new_badge']),
             source_published_at=publication_datetime(row['source_published_at']),
+            source_recency_rank=row['source_recency_rank'],
+            source_recency_basis=row['source_recency_basis'],
             is_beginner=bool(row["is_beginner"]),
             is_knit=bool(row["is_knit"]),
             sizes=tuple(json.loads(row["sizes"])) if row["sizes"] else None,

@@ -14,7 +14,7 @@ test('imported catalog has real results for every main section and quick filter'
   const reset=page.waitForResponse(r=>r.url().includes('/api/products?')&&!new URL(r.url()).searchParams.has('audience'));
   await page.locator('.audiences').getByRole('button',{name:'Все выкройки'}).click();
   await reset;
-  for(const [label,key] of [['Новинки','is_new'],['Скидки','is_sale'],['Бесплатные','is_free']]) {
+  for(const [label,key] of [['За последние 60 дней','is_new'],['Скидки','is_sale'],['Бесплатные','is_free']]) {
     const response=page.waitForResponse(r=>r.url().includes('/api/products?')&&new URL(r.url()).searchParams.get(key)==='true');
     const button=page.locator('.quick').getByRole('button',{name:new RegExp(label)});
     await button.click();

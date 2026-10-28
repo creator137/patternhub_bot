@@ -7,13 +7,14 @@ import re
 from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from time import monotonic
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit, parse_qsl, urlencode
 
 import httpx
 from bs4 import BeautifulSoup, Tag
 
 from app.models.product import ParsedProduct
 from app.providers.base import BaseProvider, ProviderResult
+from app.models.recency import RecencySnapshot
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,20 @@ class GrasserProvider(BaseProvider):
         self.requests_made = 0
         self.retries_made = 0
         self.last_skipped = 0
+        self._recency_snapshot = None
+        self._recency_order_verified = False
+
+    async def fetch_recency_snapshot(self, products):
+        if self._recency_snapshot is not None:
+            return self._recency_snapshot
+        ordered = {}
+        async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout, connect=15),
+                follow_redirects=True, trust_env=False) as client:
+            errors, *_ = await self._fetch_catalog_section(client,
+                self.catalog_url + '?SORT=SORT&ORDER_BY=DESC', ordered,
+                page_is_beginner=False, page_is_knit=False, stop_on_duplicates=True)
+        return RecencySnapshot.from_products(self.source, ordered.values(),
+            basis='source_catalog_order', complete=errors == 0 and self._recency_order_verified)
 
     async def fetch_products(self) -> ProviderResult:
         products_by_key: dict[str, ParsedProduct] = {}
@@ -71,7 +86,7 @@ class GrasserProvider(BaseProvider):
                 catalog_skipped_urls,
             ) = await self._fetch_catalog_section(
                 client,
-                self.catalog_url,
+                self.catalog_url + '?SORT=SORT&ORDER_BY=DESC',
                 products_by_key,
                 page_is_beginner=False,
                 page_is_knit=False,
@@ -81,6 +96,8 @@ class GrasserProvider(BaseProvider):
             skipped += catalog_skipped
             skipped_product_ids.update(catalog_skipped_ids)
             skipped_product_urls.update(catalog_skipped_urls)
+            self._recency_snapshot = RecencySnapshot.from_products(self.source, products_by_key.values(),
+                basis='source_catalog_order', complete=catalog_errors == 0 and self._recency_order_verified)
 
             if catalog_errors == 0:
                 for slug, is_beginner, is_knit in self.quick_filter_pages:
@@ -134,6 +151,12 @@ class GrasserProvider(BaseProvider):
                 errors += 1
                 break
 
+            if stop_on_duplicates:
+                selected = BeautifulSoup(html, 'html.parser').select_one('.sort__one.active')
+                verified = bool(selected and 'новизне' in selected.get_text(' ', strip=True).casefold()
+                                and 'desc' in selected.get('class', []))
+                self._recency_order_verified = verified if page_number == 1 else self._recency_order_verified and verified
+
             try:
                 page_products = self.parse_catalog_page(
                     html,
@@ -141,6 +164,7 @@ class GrasserProvider(BaseProvider):
                     page_is_beginner=page_is_beginner,
                     page_is_knit=page_is_knit,
                 )
+                errors += self.last_card_errors
                 skipped += self.last_skipped
                 skipped_product_ids.update(self.last_skipped_product_ids)
                 skipped_product_urls.update(self.last_skipped_product_urls)
@@ -169,6 +193,8 @@ class GrasserProvider(BaseProvider):
                 page_is_knit,
             )
             if not page_products or (stop_on_duplicates and new_count == 0):
+                if stop_on_duplicates:
+                    errors += 1  # A repeated/empty listing is not a complete ordering.
                 break
 
             next_page = self.next_page_number(html, page_number)
@@ -188,7 +214,10 @@ class GrasserProvider(BaseProvider):
         base_url = section_url or self.catalog_url
         if page_number <= 1:
             return base_url
-        return f"{base_url}?PAGEN_3={page_number}"
+        parts = urlsplit(base_url)
+        query = dict(parse_qsl(parts.query))
+        query['PAGEN_3'] = str(page_number)
+        return urlunsplit(parts._replace(query=urlencode(query)))
 
     async def _get_page(
         self, client: httpx.AsyncClient, url: str
@@ -224,6 +253,7 @@ class GrasserProvider(BaseProvider):
         products: list[ParsedProduct] = []
         seen: set[str] = set()
         self.last_skipped = 0
+        self.last_card_errors = 0
         self.last_skipped_product_ids: set[str] = set()
         self.last_skipped_product_urls: set[str] = set()
 
@@ -231,6 +261,7 @@ class GrasserProvider(BaseProvider):
             try:
                 product = self._parse_card(card, page_url)
             except (ValueError, TypeError, AttributeError) as error:
+                self.last_card_errors += 1
                 logger.warning("Could not parse Grasser product card on %s: %s", page_url, error)
                 continue
             if self._should_skip_product(product):
