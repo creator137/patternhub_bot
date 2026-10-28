@@ -34,7 +34,9 @@ test("real catalog: mobile grid, filters, detail, back, fallback and dark theme"
     )
     .toBe(true);
   await page.screenshot({ path: "test-results/catalog-mobile.png" });
+  const nextPage = page.waitForResponse(r => r.url().includes('/api/products?') && new URL(r.url()).searchParams.get('offset') === '24');
   await page.getByRole("button", { name: "Показать ещё", exact: true }).click();
+  expect((await nextPage).ok()).toBe(true);
   await expect(page.locator(".product-card")).toHaveCount(48);
   await page.getByRole("button", { name: "Фильтры", exact: true }).click();
   await expect(page.locator(".filter-drawer")).toBeVisible();

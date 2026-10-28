@@ -68,16 +68,17 @@ function end(event: TouchEvent) {
   </section>
 </template>
 <style scoped>
-.gallery { min-width: 0; }
-.gallery-stage { position: relative; touch-action: pan-y pinch-zoom; }
-.gallery-main { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.gallery { min-width: 0; max-width: 100%; align-self: start; }
+.gallery-stage { position: relative; height: clamp(180px, 45vh, 500px); height: clamp(180px, 45svh, 500px); touch-action: pan-y pinch-zoom; }
+.gallery-main { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+.gallery-main :deep(.photo) { height: 100%; aspect-ratio: auto; }
 .gallery-main :deep(.photo img) { object-fit: contain; }
 .gallery-expand, .gallery-arrow, .gallery-counter { position: absolute; background: var(--paper); color: var(--ink); }
 .gallery-expand { bottom: 14px; right: 14px; padding: 10px; border-radius: 4px; }
 .gallery-arrow { top: 45%; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 50%; cursor: pointer; }
 .previous { left: 10px; } .next { right: 10px; }
 .gallery-counter { bottom: 14px; left: 14px; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
-.gallery-thumbs { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0; }
+.gallery-thumbs { display: flex; gap: 8px; max-width: 100%; overflow-x: auto; padding: 12px 0; }
 .gallery-thumbs button { flex: 0 0 64px; height: 80px; padding: 2px; border: 2px solid transparent; background: transparent; border-radius: 4px; cursor: pointer; }
 .gallery-thumbs button.selected { border-color: var(--accent); }
 .gallery-thumbs :deep(.photo) { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 2px; }
