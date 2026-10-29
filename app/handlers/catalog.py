@@ -24,6 +24,7 @@ from aiogram.types import (
 )
 
 from app.config import load_settings
+from app.miniapp import miniapp_entry_url
 from app.branding import WELCOME_IMAGE, WELCOME_TEXT
 from app.models.product import CatalogCategory, Product, ProductFilter
 from app.services.catalog import (
@@ -99,8 +100,8 @@ def create_main_keyboard(
     rows.append([KeyboardButton(text=HOME_TEXT)])
     if miniapp_url:
         rows = [
-            [KeyboardButton(text="Открыть каталог", web_app=WebAppInfo(url=miniapp_url))],
-            [KeyboardButton(text="Поставщики", web_app=WebAppInfo(url=miniapp_url.split('#',1)[0]+'#/suppliers'))],
+            [KeyboardButton(text="Открыть каталог", web_app=WebAppInfo(url=miniapp_entry_url(miniapp_url, "catalog")))],
+            [KeyboardButton(text="Производители", web_app=WebAppInfo(url=miniapp_entry_url(miniapp_url, 'suppliers')))],
             [KeyboardButton(text=HOME_TEXT)],
         ]
     return ReplyKeyboardMarkup(

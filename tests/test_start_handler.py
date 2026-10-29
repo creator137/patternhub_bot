@@ -13,7 +13,7 @@ from aiogram.exceptions import TelegramAPIError
 class StartHandlerTests(unittest.IsolatedAsyncioTestCase):
     def test_miniapp_button_is_optional(self):
         keyboard = create_main_keyboard(miniapp_url="https://catalog.example.com/")
-        self.assertEqual(keyboard.keyboard[0][0].web_app.url, "https://catalog.example.com/")
+        self.assertEqual(keyboard.keyboard[0][0].web_app.url, "https://catalog.example.com/?section=catalog")
         self.assertFalse(any(button.web_app for row in create_main_keyboard().keyboard for button in row))
 
     async def test_start_opens_miniapp_only_in_private_chats(self):

@@ -243,6 +243,24 @@ main {
   justify-content: space-between;
   gap: 12px;
 }
+.scroll-top {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 4px 16px #0003;
+  cursor: pointer;
+  z-index: 20;
+}
+.scroll-top:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 .catalog-heading {
   margin-bottom: 20px;
 }

@@ -153,7 +153,7 @@ onMounted(async () => {
           }}</a>
           <form v-if="editingSource === s.name" class="form source-name-form"
             @submit.prevent="saveSourceName(s)" @keydown.esc.prevent="editingSource = null">
-            <label>Название поставщика<InputText v-model="sourceName" required maxlength="100" :disabled="busy" /></label>
+            <label>Название производителя<InputText v-model="sourceName" required maxlength="100" :disabled="busy" /></label>
             <div class="row">
               <Button type="submit" label="Сохранить название" :loading="busy" :disabled="busy || !sourceName.trim()" />
               <Button type="button" label="Отмена" severity="secondary" :disabled="busy" @click="editingSource = null" />
@@ -165,7 +165,7 @@ onMounted(async () => {
           <small :class="{ muted: s.parser_status === 'pending' }">{{
             s.products > 0
               ? "Выкройки доступны в каталоге"
-              : "Переход на сайт поставщика"
+              : "Переход на сайт производителя"
           }}</small>
         </article>
       </div>
@@ -195,9 +195,9 @@ onMounted(async () => {
             placeholder="https://"
             required
         /></label>
-        <label>Направление<Select v-model="specialization" :options="supplierSpecializations" optionLabel="label" optionValue="value" aria-label="Направление поставщика"/></label>
+        <label>Направление<Select v-model="specialization" :options="supplierSpecializations" optionLabel="label" optionValue="value" aria-label="Направление производителя"/></label>
         <p class="muted">
-          После включения сайт появится в разделе «Поставщики». Отдельные выкройки
+          После включения сайт появится в разделе «Производители». Отдельные выкройки
           добавляются после подключения каталога.
         </p>
         <Button type="submit" label="Добавить сайт" :disabled="busy" /></form

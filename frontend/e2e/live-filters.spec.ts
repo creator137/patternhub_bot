@@ -9,6 +9,6 @@ test('supplier directory has sorted links and distinguishes imported suppliers',
  await expect(page.locator('a[href*="andrianova-pattern.ru"],a[href*="sew-garmentfactory"]')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/suppliers-mobile.png'});
- await page.getByRole('textbox',{name:'Поиск поставщика'}).fill('marymake');
+ await page.getByRole('textbox',{name:'Поиск производителя'}).fill('marymake');
  await expect(cards).toHaveCount(1);await expect(cards.locator('a.supplier-site')).toHaveAttribute('href',/marymake/);
 });

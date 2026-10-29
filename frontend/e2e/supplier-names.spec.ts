@@ -10,15 +10,15 @@ test('administrator renames a supplier across directory, filters and cards',asyn
  const original=page.locator('article.panel').filter({has:page.getByRole('heading',{name:'VikiSews',exact:true})});
  await expect(original).toBeVisible();
  await original.getByRole('button',{name:'Изменить название'}).click();
- await original.getByLabel('Название поставщика').fill('Не сохранять');
+ await original.getByLabel('Название производителя').fill('Не сохранять');
  await original.getByRole('button',{name:'Отмена',exact:true}).click();
  await expect(original.getByRole('heading',{name:'VikiSews',exact:true})).toBeVisible();
  try {
   await original.getByRole('button',{name:'Изменить название'}).click();
   await page.setViewportSize({width:320,height:844});
-  await original.getByLabel('Название поставщика').fill('Поставщик'.repeat(11));
+  await original.getByLabel('Название производителя').fill('Производитель'.repeat(11));
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await original.getByLabel('Название поставщика').fill(alias);
+  await original.getByLabel('Название производителя').fill(alias);
   await original.getByRole('button',{name:'Сохранить название'}).click();
   await expect(page.getByRole('status')).toHaveText('Сохранено');
   await expect(page.getByRole('heading',{name:alias,exact:true})).toBeVisible();

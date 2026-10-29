@@ -28,10 +28,18 @@ import ProductImage from "./ProductImage.vue";
 import ProductGallery from "./ProductGallery.vue";
 import Admin from "./Admin.vue";
 import Suppliers from './Suppliers.vue';
+import { applyEntryRoute } from './entryRoute';
 import {alphabetically,type Supplier} from './api';
 import { useFavorites } from './useFavorites';
 const favorites = useFavorites();
 const savedOnly = ref(false);
+const showScrollTop = ref(false);
+function trackScroll() {
+  showScrollTop.value = window.scrollY > 600;
+}
+function scrollTop() {
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
 let savedReturnFilters: Record<string, string | boolean | null> | null = null;
 const meta = ref<Meta | null>(null),
   items = ref<Product[]>([]),
@@ -42,6 +50,7 @@ const meta = ref<Meta | null>(null),
   admin = ref(false),
   loginKey = ref(""),
   loginError = ref("");
+applyEntryRoute();
 const route = ref(location.hash),
   detail = ref<Product | null>(null),
   detailError = ref(""),
@@ -229,6 +238,8 @@ watch(filters, () => {
 });
 const scheme = window.matchMedia("(prefers-color-scheme: dark)");
 onMounted(async () => {
+  trackScroll();
+  window.addEventListener('scroll', trackScroll, { passive: true });
   theme();
   scheme.addEventListener("change", theme);
   tg?.ready();
@@ -255,6 +266,7 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
+  window.removeEventListener('scroll', trackScroll);
   listRequest?.abort();
   clearTimeout(timer);
   window.removeEventListener("hashchange", routeChanged);
@@ -285,7 +297,7 @@ onUnmounted(() => {
   <main>
     <nav v-if="!route.startsWith('#/product/') && route!=='#/admin'" class="view-tabs" aria-label="Разделы каталога">
       <a href="#" :class="{active:route!=='#/suppliers'}">Выкройки</a>
-      <a href="#/suppliers" :class="{active:route==='#/suppliers'}">Поставщики <small>{{meta?.supplier_count || ''}}</small></a>
+      <a href="#/suppliers" :class="{active:route==='#/suppliers'}">Производители <small>{{meta?.supplier_count || ''}}</small></a>
     </nav>
     <div v-if="favorites.notice.value" class="favorite-notice" role="status">{{ favorites.notice.value }}<button class="icon-btn" aria-label="Закрыть уведомление" @click="favorites.notice.value = ''"><i class="pi pi-times" /></button></div>
     <template v-if="route === '#/admin'"
@@ -612,4 +624,8 @@ onUnmounted(() => {
           @click="drawer = false"
         /></div></template
   ></Drawer>
+  <button v-if="showScrollTop && !drawer && route !== '#/admin' && !route.startsWith('#/product/')"
+    class="scroll-top" type="button" aria-label="Наверх" title="Наверх" @click="scrollTop">
+    <i class="pi pi-arrow-up" aria-hidden="true" />
+  </button>
 </template>

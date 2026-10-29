@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 from app.config import Settings
+from app.miniapp import miniapp_entry_url
 from app.database import Database
 from app.handlers.catalog import create_catalog_router
 from app.handlers.start import create_start_router
@@ -35,7 +36,7 @@ async def run_bot(settings: Settings) -> None:
         if settings.miniapp_url:
             await bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
-                    text="Каталог", web_app=WebAppInfo(url=settings.miniapp_url),
+                    text="Каталог", web_app=WebAppInfo(url=miniapp_entry_url(settings.miniapp_url, "catalog")),
                 )
             )
         logger.info("Starting Telegram bot in long polling mode")

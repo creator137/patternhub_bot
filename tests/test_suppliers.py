@@ -72,8 +72,8 @@ class SupplierTests(unittest.TestCase):
 
     def test_telegram_miniapp_menu_has_only_catalog_suppliers_and_home(self):
         keyboard=create_main_keyboard(miniapp_url='https://example.com/')
-        self.assertEqual([button.text for row in keyboard.keyboard for button in row],['Открыть каталог','Поставщики','🏠 Главное меню'])
-        self.assertEqual(keyboard.keyboard[1][0].web_app.url,'https://example.com/#/suppliers')
+        self.assertEqual([button.text for row in keyboard.keyboard for button in row],['Открыть каталог','Производители','🏠 Главное меню'])
+        self.assertEqual(keyboard.keyboard[1][0].web_app.url,'https://example.com/?section=suppliers')
 
     def test_existing_bags_are_migrated_without_erasing_admin_overrides(self):
         self.repo.upsert_many([ParsedProduct(source='vikisews',name='Сумка Феба',source_product_id='bag',product_url='https://vikisews.com/bag',category='Аксессуары')])
