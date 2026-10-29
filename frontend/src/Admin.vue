@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, onUnmounted, ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Select from "./CatalogSelect.vue";
@@ -18,7 +18,24 @@ import {
   supplierSpecializations,
 } from "./api";
 import ProductImage from "./ProductImage.vue";
+import { avatarBlob } from './avatarUpload';
 const props = defineProps<{ meta: Meta }>();
+const avatarFile = ref<File | null>(null);
+const avatarPreview = ref('');
+function chooseAvatar(event: Event) {
+  if (avatarPreview.value) URL.revokeObjectURL(avatarPreview.value);
+  avatarFile.value = (event.target as HTMLInputElement).files?.[0] || null;
+  avatarPreview.value = avatarFile.value ? URL.createObjectURL(avatarFile.value) : '';
+}
+async function saveAvatar() {
+  if (!avatarFile.value) return;
+  await action(async () => {
+    const blob = await avatarBlob(avatarFile.value!);
+    await api('/admin/branding/avatar','PUT',blob);
+    avatarFile.value = null;
+  });
+}
+onUnmounted(() => { if (avatarPreview.value) URL.revokeObjectURL(avatarPreview.value); });
 const media = ref<{ total: number; cached: number; queue: Record<string, number>; gallery_errors: number } | null>(null);
 const emit = defineEmits<{ changed: [] }>();
 const tab = ref("sources"),
@@ -118,6 +135,7 @@ onMounted(async () => {
           ['sources', 'Источники'],
           ['filters', 'Фильтры каталога'],
           ['products', 'Товары'],
+          ['branding', 'Оформление'],
         ]"
         :key="item[0]"
         :class="{ active: tab === item[0] }"
@@ -128,6 +146,14 @@ onMounted(async () => {
     </nav>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
+    <form v-if="tab === 'branding'" class="panel form" @submit.prevent="saveAvatar">
+      <h2>Аватарка Mini App</h2>
+      <p class="muted">Логотип рядом с allsewpattern в приложении.</p>
+      <img class="avatar-preview" :src="avatarPreview || meta.avatar_url || '/brand/avatar.jpg'" alt="Предпросмотр аватарки" />
+      <label>Выбрать изображение<input type="file" accept="image/jpeg,image/png,image/webp" :disabled="busy" @change="chooseAvatar" /></label>
+      <small class="muted">JPG, PNG или WebP до 10 МБ. Изображение будет обрезано до квадрата и уменьшено.</small>
+      <Button type="submit" label="Сохранить аватарку" :loading="busy" :disabled="busy || !avatarFile" />
+    </form>
     <template v-if="tab === 'sources'"
       ><div class="admin-grid">
         <article v-for="s in sources" :key="s.name" class="panel">

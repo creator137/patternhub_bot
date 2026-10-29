@@ -36,6 +36,7 @@ export type Product = {
 export type UIItem = { key: string; enabled: boolean };
 export type UISettings = { filters: UIItem[]; menu: UIItem[] };
 export type Meta = {
+  avatar_url?: string;
   common_filters: string[];
   supplier_count: number;
   coverage: {counts: Record<string,number>; unknown_audience:number; total:number; publication_dates?:number; new_window_days?:number; recency_ordered?:number};
@@ -92,16 +93,16 @@ export async function api<T>(
   const headers: Record<string, string> = {};
   if (tg?.initData) headers["X-Telegram-Init-Data"] = tg.initData;
   if (devKey) headers["X-Dev-Key"] = devKey;
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (body !== undefined) headers["Content-Type"] = body instanceof Blob ? (body.type || 'application/octet-stream') : "application/json";
   const response = await fetch("/api" + path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body),
     signal,
   });
   if (!response.ok)
     {
-    const detail = response.status===409 ? await response.json().catch(()=>null) : null;
+    const detail = response.status===409 || body instanceof Blob ? await response.json().catch(()=>null) : null;
     throw new Error(
       response.status === 401
         ? "Сессия истекла. Переоткройте каталог из Telegram."

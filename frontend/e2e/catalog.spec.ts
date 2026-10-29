@@ -72,7 +72,7 @@ test("real catalog: mobile grid, filters, detail, back, fallback and dark theme"
   await page.screenshot({ path: "test-results/filters-mobile.png" });
   await page.locator(".p-drawer-close-button").click();
   await page
-    .getByRole("textbox", { name: "Поиск выкроек" })
+    .getByRole("searchbox", { name: "Поиск выкроек" })
     .fill("zz-not-found-123");
   await expect(page.getByText("Пока ничего не нашлось")).toBeVisible();
   await page

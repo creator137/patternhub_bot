@@ -19,6 +19,7 @@ from app.web.auth import WebSettings, require_admin, require_user
 from app.web.catalog import FILTERS, MENUS, COMMON_FILTERS, WebCatalogRepository, WebCatalogService, safe_url
 from app.services.images import ImageCache, ImageUnavailable, image_key
 from app.repositories.media import MediaRepository
+from app.services.miniapp_branding import MiniAppBranding, MAX_AVATAR_BYTES
 
 
 class CatalogQuery(BaseModel):
@@ -81,6 +82,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     database.initialize()
     repo = WebCatalogRepository(database)
     media_repo = MediaRepository(database)
+    branding = MiniAppBranding(database)
     images = ImageCache(database.path.parent / "media", repository=media_repo)
     image_tasks: dict[tuple, asyncio.Task] = {}
     @asynccontextmanager
@@ -180,6 +182,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     def meta():
         facets = repo.page({"limit": 1})
         return {"ui": repo.public_settings(), "common_filters": COMMON_FILTERS,
+                "avatar_url": branding.avatar_url(),
                 "supplier_count": len(repo.public_suppliers()),
                 "coverage": repo.coverage(), "categories": facets["categories"], "brands": facets["brands"],
                 "category_options": [c.name for c in CATEGORIES],
@@ -188,6 +191,28 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     @app.get('/api/suppliers')
     async def public_suppliers():
         return await asyncio.to_thread(repo.public_suppliers)
+
+    @app.get('/api/branding/avatar/{key}.webp')
+    async def avatar(key: str):
+        try:
+            content = await asyncio.to_thread(branding.path(key).read_bytes)
+        except (ValueError, FileNotFoundError):
+            raise HTTPException(404, 'Avatar not found') from None
+        return Response(content, media_type='image/webp', headers={
+            'Cache-Control':'public, max-age=31536000, immutable', 'ETag':'"'+key+'"'})
+
+    @app.put('/api/admin/branding/avatar', dependencies=[Depends(require_admin)])
+    async def upload_avatar(request: Request):
+        data = bytearray()
+        async for chunk in request.stream():
+            if len(data) + len(chunk) > MAX_AVATAR_BYTES:
+                raise HTTPException(413, 'Изображение должно быть не больше 1 МБ')
+            data.extend(chunk)
+        try:
+            url = await asyncio.to_thread(branding.save, bytes(data))
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from None
+        return {'avatar_url':url}
 
     @app.get("/api/admin/session", dependencies=[Depends(require_admin)])
     def session():

@@ -322,12 +322,19 @@ main {
   position: relative;
   min-width: 0;
 }
-.search > i {
+.search-submit {
   position: absolute;
-  left: 16px;
-  top: 17px;
+  left: 2px;
+  top: 2px;
+  width: 40px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
   color: var(--muted);
 }
+.avatar-preview { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
 .search .p-inputtext {
   width: 100%;
   padding-left: 44px;
@@ -880,9 +887,7 @@ footer .logo {
     font-size: 12px;
     padding-left: 36px;
   }
-  .search > i {
-    left: 12px;
-  }
+  .search-submit { width: 32px; }
   .chips button {
     font-size: 11px;
     padding: 8px 13px;

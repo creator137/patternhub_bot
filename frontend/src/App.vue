@@ -40,6 +40,16 @@ function trackScroll() {
 function scrollTop() {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
+function submitSearch(event: Event) {
+  (event.currentTarget as HTMLFormElement).querySelector('input')?.blur();
+  clearTimeout(timer);
+  load();
+}
+function blurSearchOutside(event: PointerEvent) {
+  const input = document.activeElement;
+  if (input instanceof HTMLInputElement && input.getAttribute('aria-label') === 'Поиск выкроек'
+      && !(event.target as Element).closest('.search')) input.blur();
+}
 let savedReturnFilters: Record<string, string | boolean | null> | null = null;
 const meta = ref<Meta | null>(null),
   items = ref<Product[]>([]),
@@ -278,7 +288,7 @@ onUnmounted(() => {
 <template>
   <header class="header">
     <a href="#" class="logo"
-      ><img class="logo-image" src="/brand/avatar.jpg" alt="" />
+      ><img class="logo-image" :src="meta?.avatar_url || '/brand/avatar.jpg'" alt="" />
       <span>allsewpattern</span></a
     >
     <div class="header-right">
@@ -294,7 +304,7 @@ onUnmounted(() => {
       </button>
     </div>
   </header>
-  <main>
+  <main @pointerdown="blurSearchOutside">
     <nav v-if="!route.startsWith('#/product/') && route!=='#/admin'" class="view-tabs" aria-label="Разделы каталога">
       <a href="#" :class="{active:route!=='#/suppliers'}">Выкройки</a>
       <a href="#/suppliers" :class="{active:route==='#/suppliers'}">Производители <small>{{meta?.supplier_count || ''}}</small></a>
@@ -416,14 +426,16 @@ onUnmounted(() => {
           </button>
         </nav>
         <div class="toolbar">
-          <div v-if="enabled.includes('search')" class="search">
-            <i class="pi pi-search"></i
-            ><InputText
+          <form v-if="enabled.includes('search')" class="search" role="search" @submit.prevent="submitSearch">
+            <button class="search-submit" type="submit" aria-label="Найти"><i class="pi pi-search" aria-hidden="true" /></button>
+            <InputText
               v-model="filters.search as string"
+              type="search"
+              enterkeyhint="search"
               placeholder="Найти платье, жакет, свою идею…"
               aria-label="Поиск выкроек"
             />
-          </div>
+          </form>
           <Button
             label="Фильтры"
             icon="pi pi-sliders-h"
