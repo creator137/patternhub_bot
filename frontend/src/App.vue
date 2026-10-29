@@ -74,7 +74,7 @@ try {
 } catch { /* browsing remains available without storage */ }
 let listRequest: AbortController | null = null;
 const sortOptions = [
-  { label: "От новых к старым", value: "new_first" },
+  { label: "По новизне", value: "new_first" },
   { label: "По названию", value: "name" },
   { label: "Сначала дешевле", value: "price_asc" },
   { label: "Сначала дороже", value: "price_desc" },
