@@ -108,7 +108,7 @@ class WebCatalogRepository(ProductRepository):
         order = SORTS.get(query.get("sort"), SORTS["name"]) if "sort" in active else SORTS["name"]
         with self.database.connect() as db:
             total = db.execute(f"SELECT COUNT(*) {base} WHERE {where}", values).fetchone()[0]
-            rows = db.execute(f"SELECT p.*, COALESCE(o.category,p.category) AS effective_category, COALESCE(o.hidden,0) AS hidden, s.enabled AS source_enabled {base} WHERE {where} ORDER BY {order} LIMIT ? OFFSET ?", (*values, query.get("limit", 24), query.get("offset", 0))).fetchall()
+            rows = db.execute(f"SELECT p.*, s.display_name AS source_display_name, COALESCE(o.category,p.category) AS effective_category, COALESCE(o.hidden,0) AS hidden, s.enabled AS source_enabled {base} WHERE {where} ORDER BY {order} LIMIT ? OFFSET ?", (*values, query.get("limit", 24), query.get("offset", 0))).fetchall()
             categories = [dict(r) for r in db.execute(f"SELECT COALESCE(o.category,p.category) AS name, COUNT(*) AS count {base} WHERE {where} GROUP BY 1 HAVING COALESCE(o.category,p.category) IS NOT NULL ORDER BY 1", values)]
             brands = [dict(r) for r in db.execute(f"SELECT s.name AS source, s.display_name AS name, COUNT(*) AS count {base} WHERE {where} GROUP BY s.name ORDER BY casefold(s.display_name),s.name", values)]
         items = []

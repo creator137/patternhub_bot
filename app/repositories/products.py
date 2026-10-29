@@ -126,11 +126,11 @@ class ProductRepository:
             rows = connection.execute(
                 f"""
                 SELECT source,
-                       COALESCE(NULLIF(TRIM(brand), ''), source) AS brand_name,
+                       COALESCE((SELECT display_name FROM sources WHERE sources.name=products.source),NULLIF(TRIM(brand), ''), source) AS brand_name,
                        COUNT(*) AS count
                 FROM products
                 {where}
-                GROUP BY source, brand_name
+                GROUP BY source
                 ORDER BY brand_name
                 """,
                 parameters,
@@ -154,7 +154,7 @@ class ProductRepository:
         where, parameters = self._where(filters)
         with self.database.connect() as connection:
             rows = connection.execute(
-                f"SELECT * FROM products {where} ORDER BY name, id LIMIT ? OFFSET ?",
+                f"SELECT products.*, (SELECT display_name FROM sources WHERE sources.name=products.source) AS source_display_name FROM products {where} ORDER BY name, id LIMIT ? OFFSET ?",
                 (*parameters, limit, offset),
             ).fetchall()
         return [self._to_product(row) for row in rows]
@@ -162,7 +162,7 @@ class ProductRepository:
     def get_product(self, product_id: int) -> Product | None:
         with self.database.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM products WHERE id = ?", (product_id,)
+                "SELECT products.*, (SELECT display_name FROM sources WHERE sources.name=products.source) AS source_display_name FROM products WHERE id = ?", (product_id,)
             ).fetchone()
         return self._to_product(row) if row else None
 
@@ -293,7 +293,7 @@ class ProductRepository:
         order = ('ROW_NUMBER() OVER (PARTITION BY p.source ORDER BY p.filters_checked_at IS NOT NULL,p.gallery_checked_at IS NOT NULL,p.name,p.id),p.source'
                  if galleries else 'p.name,p.id')
         with self.database.connect() as db:
-            rows = db.execute(f"""SELECT p.* FROM products p JOIN sources s ON s.name=p.source
+            rows = db.execute(f"""SELECT p.*,s.display_name AS source_display_name FROM products p JOIN sources s ON s.name=p.source
                 WHERE {' AND '.join(clauses)} ORDER BY {order} LIMIT ?""",
                 (*values, limit)).fetchall()
         return [self._to_product(row) for row in rows]
@@ -309,7 +309,7 @@ class ProductRepository:
 
     def products_with_image(self, image_url: str) -> list[Product]:
         with self.database.connect() as db:
-            rows = db.execute("""SELECT p.* FROM products p JOIN sources s ON s.name=p.source
+            rows = db.execute("""SELECT p.*,s.display_name AS source_display_name FROM products p JOIN sources s ON s.name=p.source
                 WHERE p.is_available=1 AND s.enabled=1 AND (p.image_url=? OR EXISTS (
                 SELECT 1 FROM json_each(COALESCE(p.image_urls,'[]')) WHERE value=?))""", (image_url, image_url)).fetchall()
         return [self._to_product(row) for row in rows]
@@ -594,7 +594,7 @@ class ProductRepository:
             source=row["source"],
             source_product_id=row["source_product_id"],
             name=row["name"],
-            brand=row["brand"],
+            brand=(row['source_display_name'] if 'source_display_name' in row.keys() else None) or row["brand"],
             audience=row["audience"],
             category=row["category"],
             subcategory=row["subcategory"],

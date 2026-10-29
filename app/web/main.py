@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import uuid4
 from urllib.parse import urlsplit
 from contextlib import asynccontextmanager
@@ -10,7 +10,7 @@ from fastapi.responses import Response
 from fastapi import Request
 from hashlib import sha256
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, StringConstraints
 
 from app.config import load_settings
 from app.database import Database
@@ -45,10 +45,19 @@ class FavoriteInput(BaseModel):
     saved: bool
 
 
+SupplierName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
 class SourceInput(BaseModel):
-    display_name: str = Field(min_length=1, max_length=100)
+    display_name: SupplierName
     base_url: HttpUrl
     specialization: Literal['general','lingerie','kids','bags','pets'] = 'general'
+
+
+class SourceUpdate(BaseModel):
+    model_config = {'extra': 'forbid'}
+    enabled: bool | None = None
+    display_name: SupplierName | None = None
 
 
 class UIItem(BaseModel):
@@ -231,9 +240,13 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
         return {"ok": True}
 
     @app.patch("/api/admin/sources/{source}", dependencies=[Depends(require_admin)])
-    def toggle(source: str, value: Toggle):
+    def update_source(source: str, value: SourceUpdate):
+        updates = value.model_dump(exclude_unset=True)
+        if not updates or any(v is None for v in updates.values()):
+            raise HTTPException(422, 'Укажите название или состояние поставщика')
         with database.connect() as db:
-            cursor = db.execute("UPDATE sources SET enabled=?,updated_at=CURRENT_TIMESTAMP WHERE name=?", (value.enabled, source))
+            assignments = ','.join(f'{column}=?' for column in updates)
+            cursor = db.execute(f"UPDATE sources SET {assignments},updated_at=CURRENT_TIMESTAMP WHERE name=?", (*updates.values(), source))
             if not cursor.rowcount:
                 raise HTTPException(404, "Source not found")
         return {"ok": True}

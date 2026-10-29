@@ -661,12 +661,16 @@ footer .logo {
 }
 .admin-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .admin-grid .panel {
   margin: 12px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+.source-name-form .row { flex-wrap: wrap; }
+.source-name-form input { width: 100%; min-width: 0; }
 .admin-product {
   display: flex;
   gap: 18px;

@@ -27,6 +27,19 @@ const tab = ref("sources"),
   notice = ref(""),
   busy = ref(false);
 const ui = ref<UISettings>(JSON.parse(JSON.stringify(props.meta.ui)));
+const editingSource = ref<string | null>(null);
+const sourceName = ref("");
+function editSource(source: Source) {
+  editingSource.value = source.name;
+  sourceName.value = source.display_name;
+}
+async function saveSourceName(source: Source) {
+  await action(async () => {
+    await api('/admin/sources/' + source.name, 'PATCH', { display_name: sourceName.value.trim() });
+    editingSource.value = null;
+    await loadSources();
+  });
+}
 const name = ref(""),
   url = ref(""),
   specialization = ref('general'),
@@ -138,6 +151,16 @@ onMounted(async () => {
           <a :href="s.base_url" target="_blank" rel="noopener noreferrer">{{
             s.base_url
           }}</a>
+          <form v-if="editingSource === s.name" class="form source-name-form"
+            @submit.prevent="saveSourceName(s)" @keydown.esc.prevent="editingSource = null">
+            <label>Название поставщика<InputText v-model="sourceName" required maxlength="100" :disabled="busy" /></label>
+            <div class="row">
+              <Button type="submit" label="Сохранить название" :loading="busy" :disabled="busy || !sourceName.trim()" />
+              <Button type="button" label="Отмена" severity="secondary" :disabled="busy" @click="editingSource = null" />
+            </div>
+          </form>
+          <Button v-else type="button" label="Изменить название" icon="pi pi-pencil" text
+            :disabled="busy" @click="editSource(s)" />
           <p>{{ s.products }} товаров</p>
           <small :class="{ muted: s.parser_status === 'pending' }">{{
             s.products > 0

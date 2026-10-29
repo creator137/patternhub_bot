@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from fastapi.testclient import TestClient
 
 from app.database import Database
-from app.models.product import ParsedProduct
+from app.models.product import ParsedProduct, ProductFilter
 from app.repositories.products import ProductRepository
 from app.web.auth import WebSettings, telegram_user
 from app.web.main import create_app
@@ -72,6 +72,41 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/products").json()["total"], 1)
         self.assertEqual(self.client.get("/api/products/2").status_code, 404)
         self.assertEqual(self.client.get("/api/admin/products", headers=self.auth).json()["total"], 2)
+
+    def test_supplier_name_reaches_every_public_view_and_survives_import(self):
+        alias = 'Вики: выкройки'
+        self.client.patch('/api/admin/sources/vikisews', headers=self.auth,
+                          json={'display_name': '  '+alias+'  '}).raise_for_status()
+        self.db.initialize()
+        self.repo.upsert_many([self.p])
+        supplier = next(s for s in self.client.get('/api/suppliers').json() if s['source']=='vikisews')
+        self.assertEqual(supplier['name'], alias)
+        meta = self.client.get('/api/meta').json()
+        self.assertEqual(next(b['name'] for b in meta['brands'] if b['source']=='vikisews'),alias)
+        self.assertEqual(self.client.get('/api/products?source=vikisews').json()['items'][0]['brand'],alias)
+        self.assertEqual(self.client.get('/api/products/1').json()['brand'],alias)
+        self.assertEqual(self.repo.get_product(1).brand,alias)
+        self.assertEqual(self.repo.list_products(filters=ProductFilter(source='vikisews'))[0].brand,alias)
+        self.assertEqual(next(b.name for b in self.repo.list_brands() if b.source=='vikisews'),alias)
+        with self.db.connect() as db:
+            self.assertEqual(db.execute('SELECT source FROM products WHERE id=1').fetchone()[0],'vikisews')
+
+    def test_supplier_name_edit_preserves_visibility_and_toggle_preserves_name(self):
+        self.client.patch('/api/admin/sources/grasser',headers=self.auth,json={'enabled':False}).raise_for_status()
+        self.client.patch('/api/admin/sources/grasser',headers=self.auth,json={'display_name':'Новое название'}).raise_for_status()
+        source=next(s for s in self.client.get('/api/admin/sources',headers=self.auth).json() if s['name']=='grasser')
+        self.assertFalse(source['enabled']);self.assertEqual(source['display_name'],'Новое название')
+        self.client.patch('/api/admin/sources/grasser',headers=self.auth,json={'enabled':True}).raise_for_status()
+        self.assertEqual(self.client.get('/api/products/2').json()['brand'],'Новое название')
+
+    def test_supplier_rename_validates_input_and_requires_admin(self):
+        for body in [{},{'display_name':''},{'display_name':'   '},{'display_name':'x'*101},
+                     {'display_name':None},{'enabled':None},{'name':'hijack'}]:
+            self.assertEqual(self.client.patch('/api/admin/sources/vikisews',headers=self.auth,json=body).status_code,422)
+        payload={'display_name':'Новое название'}
+        self.assertEqual(self.client.patch('/api/admin/sources/vikisews',json=payload).status_code,401)
+        self.assertEqual(self.client.patch('/api/admin/sources/vikisews',headers={'X-Telegram-Init-Data':signed(99)},json=payload).status_code,403)
+        self.assertEqual(self.client.patch('/api/admin/sources/does-not-exist',headers=self.auth,json=payload).status_code,404)
 
     def test_override_survives_import(self):
         self.client.patch("/api/admin/products/1", headers=self.auth, json={"hidden": True, "category": "Юбки"}).raise_for_status()
