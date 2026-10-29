@@ -33,6 +33,18 @@ class Database:
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
 
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    event_id TEXT NOT NULL,
+                    kind TEXT NOT NULL CHECK(kind IN ('open','outbound')),
+                    source TEXT REFERENCES sources(name),
+                    product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id,event_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
+
                 CREATE TABLE IF NOT EXISTS products (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     source TEXT NOT NULL REFERENCES sources(name),

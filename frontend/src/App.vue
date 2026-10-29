@@ -27,6 +27,7 @@ import {
 import ProductImage from "./ProductImage.vue";
 import ProductGallery from "./ProductGallery.vue";
 import Admin from "./Admin.vue";
+import {trackEvent} from './analytics';
 import Suppliers from './Suppliers.vue';
 import { applyEntryRoute } from './entryRoute';
 import {alphabetically,type Supplier} from './api';
@@ -248,6 +249,7 @@ watch(filters, () => {
 });
 const scheme = window.matchMedia("(prefers-color-scheme: dark)");
 onMounted(async () => {
+  trackEvent('open');
   trackScroll();
   window.addEventListener('scroll', trackScroll, { passive: true });
   theme();
@@ -383,6 +385,7 @@ onUnmounted(() => {
             v-if="detail.product_url"
             class="store-link"
             :href="detail.product_url"
+            @click="trackEvent('outbound', {product_id: detail.id})"
             target="_blank"
             rel="noopener noreferrer"
             >Перейти в магазин <i class="pi pi-arrow-up-right"></i

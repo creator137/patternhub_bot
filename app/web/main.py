@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Annotated, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 from urllib.parse import urlsplit
 from contextlib import asynccontextmanager
 import asyncio
@@ -19,6 +19,7 @@ from app.web.auth import WebSettings, require_admin, require_user
 from app.web.catalog import FILTERS, MENUS, COMMON_FILTERS, WebCatalogRepository, WebCatalogService, safe_url
 from app.services.images import ImageCache, ImageUnavailable, image_key
 from app.repositories.media import MediaRepository
+from app.repositories.analytics import AnalyticsRepository
 from app.services.miniapp_branding import MiniAppBranding, MAX_AVATAR_BYTES
 
 
@@ -40,6 +41,14 @@ class CatalogQuery(BaseModel):
 
 class Toggle(BaseModel):
     enabled: bool
+
+
+class AnalyticsEvent(BaseModel):
+    model_config = {'extra': 'forbid'}
+    event_id: UUID
+    kind: Literal['open', 'outbound']
+    source: str | None = Field(None, max_length=80)
+    product_id: int | None = Field(None, gt=0)
 
 
 class FavoriteInput(BaseModel):
@@ -83,6 +92,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     repo = WebCatalogRepository(database)
     media_repo = MediaRepository(database)
     branding = MiniAppBranding(database)
+    analytics = AnalyticsRepository(database)
     images = ImageCache(database.path.parent / "media", repository=media_repo)
     image_tasks: dict[tuple, asyncio.Task] = {}
     @asynccontextmanager
@@ -213,6 +223,20 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
         except ValueError as error:
             raise HTTPException(422, str(error)) from None
         return {'avatar_url':url}
+
+    @app.post('/api/events')
+    def record_event(value: AnalyticsEvent, user_id: int = Depends(require_user)):
+        if value.kind == 'outbound' and value.product_id is None and value.source is None:
+            raise HTTPException(422, 'Destination required')
+        try:
+            analytics.record(user_id, str(value.event_id), value.kind, value.source, value.product_id)
+        except ValueError:
+            raise HTTPException(404, 'Destination not found') from None
+        return {'ok': True}
+
+    @app.get('/api/admin/analytics', dependencies=[Depends(require_admin)])
+    def analytics_summary(days: int = Query(30, ge=1, le=90)):
+        return analytics.summary(days)
 
     @app.get("/api/admin/session", dependencies=[Depends(require_admin)])
     def session():

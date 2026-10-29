@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue';
+import {trackEvent} from './analytics';
 import InputText from 'primevue/inputtext';
 import {api,alphabetically,supplierSpecializations,type Supplier} from './api';
 const emit=defineEmits<{browse:[supplier:Supplier]}>();
@@ -30,7 +31,7 @@ onMounted(load);
         <div class="supplier-info"><h3>{{supplier.name}}</h3><p>{{supplierSpecializations.find(s=>s.value===supplier.specialization)?.label || 'Выкройки'}}</p>
           <button v-if="supplier.products" class="supplier-products" @click="emit('browse',supplier)">Выкройки · {{supplier.products.toLocaleString('ru-RU')}}</button>
         </div>
-        <a :href="supplier.url" target="_blank" rel="noopener noreferrer" :aria-label="'Перейти на сайт '+supplier.name" class="supplier-site">На сайт <i class="pi pi-arrow-up-right" aria-hidden="true"/></a>
+        <a :href="supplier.url" @click="trackEvent('outbound', {source:supplier.source})" target="_blank" rel="noopener noreferrer" :aria-label="'Перейти на сайт '+supplier.name" class="supplier-site">На сайт <i class="pi pi-arrow-up-right" aria-hidden="true"/></a>
       </article>
     </div>
   </section>
