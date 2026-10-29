@@ -24,6 +24,9 @@ class GrasserProvider(BaseProvider):
     source = "grasser"
     base_url = "https://grasser.ru"
     catalog_url = f"{base_url}/vykrojki/"
+    audience_pages = (
+        'vykroyki-dlya-zhenshchin', 'muzhskie-vykrojki', 'detskie-vykrojki',
+    )
     quick_filter_pages = (
         ("vykroyki-dlya-nachinayushchikh", True, False),
         ("zhenskie-vykroyki-dlya-nachinayushchikh", True, False),
@@ -47,6 +50,7 @@ class GrasserProvider(BaseProvider):
         self.last_skipped = 0
         self._recency_snapshot = None
         self._recency_order_verified = False
+        self._audience_evidence: dict[str, set[str]] = {}
 
     async def fetch_recency_snapshot(self, products):
         if self._recency_snapshot is not None:
@@ -62,6 +66,7 @@ class GrasserProvider(BaseProvider):
 
     async def fetch_products(self) -> ProviderResult:
         products_by_key: dict[str, ParsedProduct] = {}
+        self._audience_evidence = {}
         errors = 0
         skipped = 0
         skipped_product_ids: set[str] = set()
@@ -100,6 +105,17 @@ class GrasserProvider(BaseProvider):
                 basis='source_catalog_order', complete=catalog_errors == 0 and self._recency_order_verified)
 
             if catalog_errors == 0:
+                # Common /vse-vykrojki/ product URLs do not encode gender.
+                # Read the manufacturer's audience listings, retaining stable IDs.
+                for slug in self.audience_pages:
+                    section_products: dict[str, ParsedProduct] = {}
+                    section_errors, *_ = await self._fetch_catalog_section(
+                        client, urljoin(self.catalog_url, f'{slug}/'), section_products,
+                        page_is_beginner=False, page_is_knit=False, stop_on_duplicates=False)
+                    errors += section_errors or int(not section_products)
+                    for key, product in section_products.items():
+                        existing = products_by_key.get(key)
+                        products_by_key[key] = self._merge_product(existing, product) if existing else product
                 for slug, is_beginner, is_knit in self.quick_filter_pages:
                     section_url = urljoin(self.catalog_url, f"{slug}/")
                     (
@@ -121,7 +137,8 @@ class GrasserProvider(BaseProvider):
                     skipped_product_urls.update(section_skipped_urls)
 
         return ProviderResult(
-            list(products_by_key.values()),
+            [replace(product, audience=self._resolve_audience(self._audience_evidence.get(key, set())))
+             for key, product in products_by_key.items()],
             errors,
             skipped=skipped,
             skipped_product_ids=tuple(skipped_product_ids),
@@ -176,6 +193,8 @@ class GrasserProvider(BaseProvider):
             new_count = 0
             for product in page_products:
                 key = product.source_product_id or product.product_url
+                if product.audience:
+                    self._audience_evidence.setdefault(key, set()).add(product.audience)
                 existing = products_by_key.get(key)
                 if existing is None:
                     new_count += 1
@@ -227,6 +246,10 @@ class GrasserProvider(BaseProvider):
             try:
                 response = await client.get(url)
                 response.raise_for_status()
+                expected = self._audience_from_url(url)
+                if expected and self._audience_from_url(str(response.url)) != expected:
+                    logger.warning('Grasser audience listing redirected away: %s -> %s', url, response.url)
+                    return None
                 return response.text
             except httpx.HTTPError as error:
                 logger.warning(
@@ -258,6 +281,12 @@ class GrasserProvider(BaseProvider):
         self.last_skipped_product_urls: set[str] = set()
 
         for card in soup.select(".catalog.vykrojki > .catalog-block"):
+            # The same grid also contains clearly marked advertising banners.
+            # They have no product title/ID and must not fail the catalog crawl.
+            if ('catalog-block--span-1' in card.get('class', [])
+                    and not card.select_one('.catalog-block__title[href]')
+                    and card.select_one('a.catalog-block__inner[href]')):
+                continue
             try:
                 product = self._parse_card(card, page_url)
             except (ValueError, TypeError, AttributeError) as error:
@@ -307,7 +336,7 @@ class GrasserProvider(BaseProvider):
         name = re.sub(r"\s+", " ", str(name)).strip()
         source_product_id = self._source_product_id(card, name)
         raw_category = self._category_from_url(product_url) or self._category_from_name(name)
-        audience = self._audience_from_url(product_url)
+        audience = self._audience_from_url(product_url) or self._audience_from_url(page_url)
         if audience in {"men", "kids"}:
             raw_category = self._category_from_name(name)
         price, old_price = self._extract_prices(card)
@@ -396,7 +425,7 @@ class GrasserProvider(BaseProvider):
             name=name,
             product_url=canonical,
         )
-        audience = base.audience or self._audience_from_url(canonical)
+        audience = self._audience_from_url(canonical) or base.audience
         category = base.category or self._category_from_url(canonical) or self._category_from_name(name)
         if audience in {"men", "kids"}:
             category = self._category_from_name(name) or category
@@ -497,12 +526,23 @@ class GrasserProvider(BaseProvider):
 
     @staticmethod
     def _audience_from_url(product_url: str) -> str | None:
-        if "/muzhskie-vykrojki/" in product_url:
-            return "men"
-        if "/detskie-vykrojki/" in product_url:
-            return "kids"
-        if "/vykrojki/" in product_url:
-            return "women"
+        # Match actual section segments, never the common /vykrojki/ prefix.
+        sections = set(urlsplit(product_url).path.strip('/').split('/'))
+        if sections & {'muzhskie-vykrojki', 'muzhskie-vykroyki-dlya-nachinayushchikh'}:
+            return 'men'
+        if sections & {'detskie-vykrojki', 'detskie-vykroyki-dlya-nachinayushchikh'}:
+            return 'kids'
+        if sections & {'vykroyki-dlya-zhenshchin', 'zhenskie-vykroyki-dlya-nachinayushchikh'}:
+            return 'women'
+        return None
+
+    @staticmethod
+    def _resolve_audience(evidence: set[str]) -> str | None:
+        if len(evidence) == 1:
+            return next(iter(evidence))
+        if evidence and evidence <= {'women', 'men', 'unisex'}:
+            return 'unisex'
+        # No evidence, or contradictory child/adult listings: don't guess.
         return None
 
     @staticmethod

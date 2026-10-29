@@ -42,7 +42,7 @@ class GrasserProviderTests(unittest.TestCase):
         self.assertEqual(sale.source_product_id, "153947")
         self.assertEqual(sale.name, "Свитер, выкройка №1380")
         self.assertEqual(sale.brand, "Grasser")
-        self.assertEqual(sale.audience, "women")
+        self.assertIsNone(sale.audience)
         self.assertEqual(sale.category, "Худи, футболки и лонгсливы")
         self.assertEqual(sale.subcategory, "Свитер")
         self.assertEqual(sale.price, Decimal("196.00"))
@@ -227,3 +227,81 @@ class GrasserRepositoryIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class GrasserAudienceRegressionTests(unittest.IsolatedAsyncioTestCase):
+    def card(self, name='Брюки', key='123', url='/vykrojki/vse-vykrojki/bryuki/'):
+        return f'''<div class="catalog vykrojki"><div class="catalog-block">
+            <a class="catalog-block__title" href="{url}">{name}</a>
+            <button data-id="{key}"></button></div></div>'''
+
+    def test_generic_product_url_never_implies_women(self):
+        provider=GrasserProvider()
+        for name in ['Мужские брюки', 'Брюки', 'Детская куртка']:
+            p=provider.parse_catalog_page(self.card(name),provider.catalog_url)[0]
+            self.assertIsNone(p.audience)
+        self.assertIsNone(provider._audience_from_url('https://grasser.ru/vykrojki/verkhnyaya-odezhda/kurtka/'))
+
+    def test_audience_comes_from_listing_even_with_generic_product_url(self):
+        provider=GrasserProvider()
+        for section,audience in [('vykroyki-dlya-zhenshchin','women'),('muzhskie-vykrojki','men'),('detskie-vykrojki','kids')]:
+            p=provider.parse_catalog_page(self.card(),provider.catalog_url+section+'/')[0]
+            self.assertEqual(p.audience,audience)
+            self.assertEqual(p.category,'Брюки и шорты')
+
+    def test_detail_canonical_overrides_old_wrong_seed(self):
+        provider=GrasserProvider()
+        seed=ParsedProduct(source='grasser',name='Брюки',audience='women',product_url='https://grasser.ru/vykrojki/vse-vykrojki/bryuki/')
+        p=provider.parse_product_page('<link rel="canonical" href="https://grasser.ru/vykrojki/muzhskie-vykrojki/bryuki/">',seed.product_url,seed)
+        self.assertEqual(p.audience,'men')
+
+    async def test_section_membership_survives_duplicate_merge_and_repeat_upsert(self):
+        from unittest.mock import AsyncMock
+        from app.web.catalog import WebCatalogRepository
+        provider=GrasserProvider()
+        provider.quick_filter_pages=()
+        all_cards=self.card('Мужские брюки','123')+self.card('Платье','456', '/vykrojki/vse-vykrojki/plate/')+self.card('Брюки','789','/vykrojki/vse-vykrojki/kids/')
+        def response(client,url):
+            if '/muzhskie-vykrojki/' in url:return self.card('Мужские брюки','123')
+            if '/detskie-vykrojki/' in url:return self.card('Брюки','789','/vykrojki/vse-vykrojki/kids/')
+            if '/vykroyki-dlya-zhenshchin/' in url:return self.card('Платье','456','/vykrojki/vse-vykrojki/plate/')
+            return all_cards
+        provider._get_page=AsyncMock(side_effect=response)
+        result=await provider.fetch_products()
+        self.assertTrue(result.complete);self.assertEqual(len(result.products),3)
+        self.assertEqual({p.source_product_id:p.audience for p in result.products},{'123':'men','456':'women','789':'kids'})
+        with tempfile.TemporaryDirectory() as tmp:
+            db=Database(Path(tmp)/'catalog.sqlite3');db.initialize();repo=ProductRepository(db)
+            old=[ParsedProduct(source='grasser',source_product_id=p.source_product_id,name=p.name,audience='women',product_url=p.product_url) for p in result.products]
+            repo.upsert_many(old)
+            self.assertEqual(repo.upsert_many(result.products),(0,3))
+            self.assertEqual(repo.upsert_many(result.products),(0,3))
+            for audience in ('women','men','kids'):
+                page=WebCatalogRepository(db).page({'source':'grasser','audience':audience})
+                self.assertEqual(page['total'],1)
+                self.assertEqual(page['items'][0]['audience'],audience)
+
+    async def test_failed_or_empty_audience_section_is_incomplete(self):
+        from unittest.mock import AsyncMock
+        for empty in (None,'<html></html>'):
+            provider=GrasserProvider();provider.quick_filter_pages=()
+            def response(client,url):
+                return empty if '/muzhskie-vykrojki/' in url else self.card()
+            provider._get_page=AsyncMock(side_effect=response)
+            self.assertFalse((await provider.fetch_products()).complete)
+
+    def test_conflicting_audience_evidence_is_conservative(self):
+        provider=GrasserProvider()
+        self.assertEqual(provider._resolve_audience({'women','men'}),'unisex')
+        self.assertIsNone(provider._resolve_audience({'kids','men'}))
+        self.assertIsNone(provider._resolve_audience(set()))
+
+    def test_real_generic_urls_use_audience_context_and_ads_are_not_errors(self):
+        html=(FIXTURES/'grasser_audiences.html').read_text()
+        provider=GrasserProvider()
+        products=provider.parse_catalog_page(html,provider.catalog_url)
+        self.assertEqual(len(products),3)
+        self.assertEqual(provider.last_card_errors,0)
+        self.assertTrue(all(p.audience is None for p in products))
+        men=provider.parse_catalog_page(html,provider.catalog_url+'muzhskie-vykrojki/')
+        self.assertEqual(men[1].name,'Мужские брюки, выкройка №1326')
+        self.assertEqual((men[1].audience,men[1].category),('men','Брюки и шорты'))
