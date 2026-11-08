@@ -19,6 +19,7 @@ import {
 } from "./api";
 import ProductImage from "./ProductImage.vue";
 import Analytics from './Analytics.vue';
+import AdminSubscription from './AdminSubscription.vue';
 import { avatarBlob } from './avatarUpload';
 const props = defineProps<{ meta: Meta }>();
 const avatarFile = ref<File | null>(null);
@@ -138,6 +139,7 @@ onMounted(async () => {
           ['products', 'Товары'],
           ['branding', 'Оформление'],
           ['analytics', 'Статистика'],
+          ['subscription', 'Подписка'],
         ]"
         :key="item[0]"
         :class="{ active: tab === item[0] }"
@@ -149,6 +151,7 @@ onMounted(async () => {
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <Analytics v-if="tab === 'analytics'" />
+    <AdminSubscription v-if="tab === 'subscription'" @changed="emit('changed')" />
     <form v-if="tab === 'branding'" class="panel form" @submit.prevent="saveAvatar">
       <h2>Аватарка Mini App</h2>
       <p class="muted">Логотип рядом с allsewpattern в приложении.</p>

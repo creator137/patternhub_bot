@@ -1,8 +1,8 @@
 # allsewpattern: эксплуатация
 
-Приложение: `/opt/allsewpattern` на VPS `2.56.240.132`.
+Приложение: `/opt/allsewpattern` на VPS `83.142.30.7` (восстановление 8 ноября 2026).
 Бот: `@allsewpattern_bot`.
-Mini App: `https://allsewpattern.2.56.240.132.sslip.io/`.
+Mini App: `https://allsewpattern.83.142.30.7.sslip.io/`.
 Техническое DNS-имя указывает на IP сервера, отдельная покупка домена не нужна.
 Работа этого имени зависит от внешнего DNS-сервиса sslip.io.
 

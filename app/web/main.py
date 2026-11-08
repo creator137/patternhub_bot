@@ -21,6 +21,8 @@ from app.services.images import ImageCache, ImageUnavailable, image_key
 from app.repositories.media import MediaRepository
 from app.repositories.analytics import AnalyticsRepository
 from app.services.miniapp_branding import MiniAppBranding, MAX_AVATAR_BYTES
+from app.web.subscriptions import install as install_subscriptions, require_access, reconcile
+from app.web.merchant import router as merchant_router
 
 
 class CatalogQuery(BaseModel):
@@ -97,7 +99,10 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     image_tasks: dict[tuple, asyncio.Task] = {}
     @asynccontextmanager
     async def lifespan(app):
+        billing_task = asyncio.create_task(reconcile(app.state.subscriptions, app.state.yookassa))
         yield
+        billing_task.cancel()
+        await asyncio.gather(billing_task, return_exceptions=True)
         for task in list(image_tasks.values()):
             task.cancel()
         await asyncio.gather(*list(image_tasks.values()), return_exceptions=True)
@@ -107,6 +112,8 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     app.state.database = database
     app.state.catalog = WebCatalogService(repo)
     app.state.images = images
+    install_subscriptions(app, database)
+    app.include_router(merchant_router)
 
     @app.middleware("http")
     async def security_headers(request, call_next):
@@ -121,11 +128,11 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
             response.headers['Cache-Control'] = 'no-cache'
         return response
 
-    @app.get("/api/products")
+    @app.get("/api/products", dependencies=[Depends(require_access)])
     async def products(query: CatalogQuery = Depends()):
         return await app.state.catalog.browse(query.model_dump())
 
-    @app.get("/api/products/{product_id}")
+    @app.get("/api/products/{product_id}", dependencies=[Depends(require_access)])
     async def product(product_id: int):
         result = (await app.state.catalog.browse({"id": product_id}))["items"]
         if not result:
@@ -198,7 +205,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
                 "category_options": [c.name for c in CATEGORIES],
                 "local_login": app.state.web_settings.environment == "local" and bool(app.state.web_settings.dev_key)}
 
-    @app.get('/api/suppliers')
+    @app.get('/api/suppliers', dependencies=[Depends(require_access)])
     async def public_suppliers():
         return await asyncio.to_thread(repo.public_suppliers)
 
@@ -242,7 +249,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
     def session():
         return {"admin": True}
 
-    @app.get('/api/favorites')
+    @app.get('/api/favorites', dependencies=[Depends(require_access)])
     def favorites(user_id: int = Depends(require_user)):
         with database.connect() as db:
             rows = db.execute("""SELECT f.product_id FROM favorites f JOIN products p ON p.id=f.product_id
@@ -251,7 +258,7 @@ def create_app(database: Database | None = None, web_settings: WebSettings | Non
                 ORDER BY f.created_at DESC, f.product_id DESC LIMIT 500""", (user_id,)).fetchall()
         return {'ids': [row[0] for row in rows]}
 
-    @app.put('/api/favorites/{product_id}')
+    @app.put('/api/favorites/{product_id}', dependencies=[Depends(require_access)])
     def favorite(product_id: int, value: FavoriteInput, user_id: int = Depends(require_user)):
         if value.saved and not repo.page({'id': product_id, 'limit': 1})['total']:
             raise HTTPException(404, 'Product not found')

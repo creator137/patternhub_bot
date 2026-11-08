@@ -65,6 +65,7 @@ export const supplierSpecializations = [
   {value:'kids',label:'Детские выкройки'}, {value:'bags',label:'Сумки'}, {value:'pets',label:'Для животных'},
 ];
 type Telegram = {
+  openLink?: (url: string) => void;
   initData: string;
   colorScheme: string;
   ready: () => void;
@@ -102,7 +103,8 @@ export async function api<T>(
   });
   if (!response.ok)
     {
-    const detail = response.status===409 || body instanceof Blob ? await response.json().catch(()=>null) : null;
+    if(response.status===402) window.dispatchEvent(new Event('subscription-required'));
+    const detail = await response.json().catch(()=>null);
     throw new Error(
       response.status === 401
         ? "Сессия истекла. Переоткройте каталог из Telegram."

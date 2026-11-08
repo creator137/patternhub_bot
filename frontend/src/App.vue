@@ -27,6 +27,14 @@ import {
 import ProductImage from "./ProductImage.vue";
 import ProductGallery from "./ProductGallery.vue";
 import Admin from "./Admin.vue";
+import Subscription from './Subscription.vue';
+import {plan,access,refreshSubscription,until} from './subscription';
+const subscriptionRequired = ref(false);
+function needSubscription(){subscriptionRequired.value=true;}
+async function subscriptionChanged(){
+  subscriptionRequired.value=!!plan.value?.enabled && !access.value?.has_access && !admin.value;
+  if(!subscriptionRequired.value){favorites.notice.value='';await favorites.initialize();await load();await routeChanged();}
+}
 import {trackEvent} from './analytics';
 import Suppliers from './Suppliers.vue';
 import { applyEntryRoute } from './entryRoute';
@@ -116,6 +124,7 @@ function query(offset = 0) {
   return p;
 }
 async function load(more = false) {
+  if(subscriptionRequired.value && !admin.value){items.value=[];loading.value=false;return;}
   const id = ++requestId;
   listRequest?.abort();
   listRequest = new AbortController();
@@ -181,6 +190,7 @@ const activeFilters = computed(() => Object.entries(filters)
 function openAdmin() {
   location.hash = "/admin";
 }
+function openSubscription() { location.hash='/subscription'; }
 function open(p: Product) {
   scroll = window.scrollY;
   location.hash = "/product/" + p.id;
@@ -191,6 +201,7 @@ function back() {
 }
 async function routeChanged() {
   route.value = location.hash;
+  if(subscriptionRequired.value && !admin.value)return;
   const id = ++detailId;
   if (route.value.startsWith("#/product/")) {
     detail.value = null;
@@ -235,6 +246,8 @@ async function login() {
 }
 async function changed() {
   try {
+    await refreshSubscription();
+    subscriptionRequired.value=!!plan.value?.enabled && !access.value?.has_access && !admin.value;
     await refreshMeta();
     await load();
   } catch (e) {
@@ -249,6 +262,7 @@ watch(filters, () => {
 });
 const scheme = window.matchMedia("(prefers-color-scheme: dark)");
 onMounted(async () => {
+  window.addEventListener('subscription-required',needSubscription);
   trackEvent('open');
   trackScroll();
   window.addEventListener('scroll', trackScroll, { passive: true });
@@ -260,17 +274,20 @@ onMounted(async () => {
   tg?.BackButton.onClick(back);
   window.addEventListener("hashchange", routeChanged);
   try {
+    await refreshSubscription();
+    subscriptionRequired.value=!!plan.value?.enabled && !access.value?.has_access;
     await refreshMeta();
-    await load();
-    await favorites.initialize();
     if (tg?.initData) {
       try {
         await api("/admin/session");
         admin.value = true;
+        subscriptionRequired.value=false;
       } catch {
         /* public browsing remains available */
       }
     }
+    await load();
+    if(!subscriptionRequired.value) await favorites.initialize();
     await routeChanged();
   } catch (e) {
     error.value = (e as Error).message;
@@ -278,6 +295,7 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
+  window.removeEventListener('subscription-required',needSubscription);
   window.removeEventListener('scroll', trackScroll);
   listRequest?.abort();
   clearTimeout(timer);
@@ -294,6 +312,7 @@ onUnmounted(() => {
       <span>allsewpattern</span></a
     >
     <div class="header-right">
+      <button class="icon-btn" aria-label="Подписка" title="Подписка" @click="openSubscription"><i class="pi pi-user"/></button>
       <button class="icon-btn saved-nav" :class="{ active: savedOnly }" :aria-label="'Избранное (' + favorites.ids.value.length + ')'" title="Избранное" @click="toggleSavedView">
         <i :class="savedOnly ? 'pi pi-heart-fill' : 'pi pi-heart'" /><span v-if="favorites.ids.value.length" class="saved-count">{{ favorites.ids.value.length }}</span>
       </button><button
@@ -307,7 +326,8 @@ onUnmounted(() => {
     </div>
   </header>
   <main @pointerdown="blurSearchOutside">
-    <nav v-if="!route.startsWith('#/product/') && route!=='#/admin'" class="view-tabs" aria-label="Разделы каталога">
+    <a v-if="plan?.enabled && route!=='#/admin' && route!=='#/subscription'" href="#/subscription" class="favorite-notice">{{access?.has_access ? 'Доступ до '+until(access.access_until) : '7 дней бесплатно · Подписка'}}</a>
+    <nav v-if="!route.startsWith('#/product/') && route!=='#/admin' && route!=='#/subscription'" class="view-tabs" aria-label="Разделы каталога">
       <a href="#" :class="{active:route!=='#/suppliers'}">Выкройки</a>
       <a href="#/suppliers" :class="{active:route==='#/suppliers'}">Производители <small>{{meta?.supplier_count || ''}}</small></a>
     </nav>
@@ -329,6 +349,7 @@ onUnmounted(() => {
         <p v-if="loginError" class="error" role="alert">{{ loginError }}</p>
       </section></template
     >
+    <Subscription v-else-if="route==='#/subscription' || subscriptionRequired" @changed="subscriptionChanged"/>
     <Suppliers v-else-if="route==='#/suppliers'" @browse="browseSupplier"/>
     <template v-else-if="route.startsWith('#/product/')"
       ><button class="back" @click="back">← К выкройкам</button
@@ -583,6 +604,8 @@ onUnmounted(() => {
     <a href="#" class="logo">allsewpattern</a>
     <p>Место, где идеи обретают форму.</p>
     <span>Сервис по подбору выкроек · цены уточняйте у брендов</span>
+    <a href="/subscription" target="_blank" rel="noopener">Стоимость подписки</a>
+    <a href="/seller" target="_blank" rel="noopener">Реквизиты и контакты</a>
   </footer>
   <Drawer
     id="filters"

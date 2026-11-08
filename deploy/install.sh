@@ -28,6 +28,6 @@ systemctl daemon-reload
 systemctl enable --now allsewpattern-web
 nginx -t
 systemctl reload nginx
-certbot --nginx -d allsewpattern.2.56.240.132.sslip.io --non-interactive --agree-tos --register-unsafely-without-email --redirect
+certbot --nginx -d allsewpattern.83.142.30.7.sslip.io --non-interactive --agree-tos --register-unsafely-without-email --redirect
 systemctl enable --now allsewpattern-bot allsewpattern-refresh.timer allsewpattern-media.timer allsewpattern-galleries.timer
 systemctl --no-pager is-active allsewpattern-bot allsewpattern-web nginx
