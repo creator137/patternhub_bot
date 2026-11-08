@@ -42,11 +42,11 @@ onMounted(()=>action(refresh));
       <p v-else-if="!tg?.initData">Откройте приложение из Telegram, чтобы активировать доступ и оплатить подписку.</p>
       <template v-else>
         <Button v-if="access?.trial_available" label="Попробовать 7 дней бесплатно" :loading="busy" @click="action(async()=>{await api('/subscription/trial','POST');})"/>
-        <label v-if="plan.terms_url" class="subscription-consent"><Checkbox v-model="accepted" binary inputId="accept-subscription"/><span>Принимаю <a :href="plan.terms_url" target="_blank" rel="noopener noreferrer">условия подписки</a>. Оплата {{rub(plan.price_kopecks)}} за 30 дней, без автопродления.</span></label>
+        <label v-if="plan.terms_url" class="subscription-consent"><Checkbox v-model="accepted" binary inputId="accept-subscription"/><span>Принимаю <a href="#/info/terms">условия подписки</a>. Оплата {{rub(plan.price_kopecks)}} за 30 дней, без автопродления.</span></label>
         <Button :label="`Оплатить 30 дней — ${rub(plan.price_kopecks)}`" :loading="busy" :disabled="!accepted || !plan.payments_ready || !plan.price_kopecks" @click="pay"/>
         <small>Если продлить заранее, 30 дней добавятся к оставшемуся сроку доступа.</small>
       </template>
-      <a v-if="plan.support_url" :href="plan.support_url" target="_blank" rel="noopener noreferrer">Поддержка и вопросы по оплате</a>
+      <small><a href="#/info/about">О сервисе и поддержка</a></small>
       <Button label="Обновить статус доступа" severity="secondary" :loading="busy" @click="action(refresh)"/>
       <template v-if="payments.length">
         <h2>История платежей</h2>

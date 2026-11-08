@@ -33,6 +33,11 @@ def merchant(database):
 router = APIRouter()
 
 
+@router.get('/api/merchant')
+def public_merchant(request: Request):
+    return merchant(request.app.state.database)
+
+
 @router.get('/api/admin/merchant', dependencies=[Depends(require_admin)])
 def get_merchant(request: Request):
     return merchant(request.app.state.database)

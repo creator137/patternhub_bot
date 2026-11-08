@@ -28,6 +28,9 @@ import ProductImage from "./ProductImage.vue";
 import ProductGallery from "./ProductGallery.vue";
 import Admin from "./Admin.vue";
 import Subscription from './Subscription.vue';
+import ServiceInfo from './ServiceInfo.vue';
+let infoReturnRoute='';
+let infoScroll=0;
 import {plan,access,refreshSubscription,until} from './subscription';
 const subscriptionRequired = ref(false);
 function needSubscription(){subscriptionRequired.value=true;}
@@ -196,11 +199,21 @@ function open(p: Product) {
   location.hash = "/product/" + p.id;
 }
 function back() {
+  if(route.value.startsWith('#/info/')){
+    location.hash=infoReturnRoute;
+    nextTick(()=>window.scrollTo(0,infoScroll));
+    return;
+  }
   location.hash = "";
   nextTick(() => window.scrollTo(0, scroll));
 }
 async function routeChanged() {
+  if(location.hash.startsWith('#/info/') && !route.value.startsWith('#/info/')){
+    infoReturnRoute=route.value;
+    infoScroll=window.scrollY;
+  }
   route.value = location.hash;
+  if(route.value.startsWith('#/info/')){tg?.BackButton.show();window.scrollTo(0,0);return;}
   if(subscriptionRequired.value && !admin.value)return;
   const id = ++detailId;
   if (route.value.startsWith("#/product/")) {
@@ -327,7 +340,7 @@ onUnmounted(() => {
   </header>
   <main @pointerdown="blurSearchOutside">
     <a v-if="plan?.enabled && route!=='#/admin' && route!=='#/subscription'" href="#/subscription" class="favorite-notice">{{access?.has_access ? 'Доступ до '+until(access.access_until) : '7 дней бесплатно · Подписка'}}</a>
-    <nav v-if="!route.startsWith('#/product/') && route!=='#/admin' && route!=='#/subscription'" class="view-tabs" aria-label="Разделы каталога">
+    <nav v-if="!route.startsWith('#/product/') && !route.startsWith('#/info/') && route!=='#/admin' && route!=='#/subscription'" class="view-tabs" aria-label="Разделы каталога">
       <a href="#" :class="{active:route!=='#/suppliers'}">Выкройки</a>
       <a href="#/suppliers" :class="{active:route==='#/suppliers'}">Производители <small>{{meta?.supplier_count || ''}}</small></a>
     </nav>
@@ -349,6 +362,7 @@ onUnmounted(() => {
         <p v-if="loginError" class="error" role="alert">{{ loginError }}</p>
       </section></template
     >
+    <ServiceInfo v-else-if="route.startsWith('#/info/')" :section="route.slice(7)" @back="back"/>
     <Subscription v-else-if="route==='#/subscription' || subscriptionRequired" @changed="subscriptionChanged"/>
     <Suppliers v-else-if="route==='#/suppliers'" @browse="browseSupplier"/>
     <template v-else-if="route.startsWith('#/product/')"
@@ -604,8 +618,7 @@ onUnmounted(() => {
     <a href="#" class="logo">allsewpattern</a>
     <p>Место, где идеи обретают форму.</p>
     <span>Сервис по подбору выкроек · цены уточняйте у брендов</span>
-    <a href="/subscription" target="_blank" rel="noopener">Стоимость подписки</a>
-    <a href="/seller" target="_blank" rel="noopener">Реквизиты и контакты</a>
+    <small class="service-links"><a href="#/info/terms">Условия</a> · <a href="#/info/about">О сервисе</a></small>
   </footer>
   <Drawer
     id="filters"
