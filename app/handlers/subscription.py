@@ -3,6 +3,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 
 from app.miniapp import miniapp_entry_url
+from urllib.parse import urljoin
 from app.services.subscriptions import SubscriptionService
 from app.services.yookassa import YooKassa
 from app.web.auth import WebSettings
@@ -60,6 +61,6 @@ def create_subscription_router(service: SubscriptionService, url):
     @router.message(Command('paysupport', 'support', 'terms'))
     async def support(message: Message):
         plan = service.plan()
-        await message.answer('Условия подписки: ' + (plan['terms_url'] or 'будут опубликованы до запуска оплаты') +
-                             '\nПоддержка и возвраты: ' + (plan['support_url'] or 'контакт будет опубликован до запуска оплаты'))
+        await message.answer('Условия подписки: ' + urljoin(url or '', plan['terms_url']) +
+                             '\nПоддержка и возвраты: ' + urljoin(url or '', plan['support_url']))
     return router

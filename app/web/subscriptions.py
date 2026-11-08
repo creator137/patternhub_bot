@@ -24,6 +24,8 @@ class PlanInput(BaseModel):
     @field_validator('terms_url', 'support_url')
     @classmethod
     def safe_link(cls, value):
+        if value in {'/terms', '/seller'}:
+            return value
         url = urlsplit(value)
         if value and (url.scheme != 'https' or not url.hostname or url.username or url.password):
             raise ValueError('Нужна HTTPS-ссылка')
@@ -31,8 +33,8 @@ class PlanInput(BaseModel):
 
     @model_validator(mode='after')
     def enabled_plan(self):
-        if self.enabled and (self.price_kopecks < 100 or not self.terms_url or not self.support_url):
-            raise ValueError('Укажите цену от 1 ₽, условия и контакт поддержки')
+        if self.enabled and self.price_kopecks < 100:
+            raise ValueError('Укажите цену от 1 ₽')
         return self
 
 
@@ -102,7 +104,8 @@ def admin_plan(request: Request):
 def save_plan(body: PlanInput, request: Request):
     if body.enabled and not request.app.state.yookassa.ready():
         raise HTTPException(409, 'Сначала настройте магазин ЮKassa и PAYMENTS_ENABLED')
-    service(request).save_plan(body.model_dump())
+    # Owner only configures the tariff. Public pages are maintained by the app.
+    service(request).save_plan(body.model_dump() | {'terms_url': '/terms', 'support_url': '/seller'})
     return public_plan(request)
 
 

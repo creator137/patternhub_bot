@@ -171,12 +171,16 @@ class SubscriptionTests(unittest.TestCase):
     def test_admin_plan_validation(self):
         client = TestClient(create_app(self.db, WebSettings('test-token', frozenset({42}))))
         plan = self.s.plan()
-        for changed in ({'price_kopecks': -1}, {'price_kopecks': 1.5}, {'terms_url': 'javascript:alert(1)'}, {'support_url': ''}):
+        for changed in ({'price_kopecks': -1}, {'price_kopecks': 1.5}, {'terms_url': 'javascript:alert(1)'}):
             self.assertEqual(client.put('/api/admin/subscription', headers=auth(42), json=plan | changed).status_code, 422)
         with patch.object(YooKassa, 'ready', return_value=False):
             self.assertEqual(client.put('/api/admin/subscription', headers=auth(42), json=plan).status_code, 409)
         with patch.object(YooKassa, 'ready', return_value=True):
-            self.assertEqual(client.put('/api/admin/subscription', headers=auth(42), json=plan | {'price_kopecks': 99000}).status_code, 200)
+            result = client.put('/api/admin/subscription', headers=auth(42), json={'enabled': True, 'price_kopecks': 99000})
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.json()['terms_url'], '/terms')
+            self.assertEqual(result.json()['support_url'], '/seller')
+        self.assertIn('990,00 ₽', client.get('/terms').text)
         self.assertEqual(self.s.plan()['price_kopecks'], 99000)
         client.close()
 

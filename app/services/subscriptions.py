@@ -41,7 +41,10 @@ class SubscriptionService:
     def plan(self):
         with self.db.connect() as c:
             row = c.execute("SELECT value FROM settings WHERE key='subscription.plan'").fetchone()
-        return DEFAULT_PLAN | (json.loads(row[0]) if row else {})
+        plan = DEFAULT_PLAN | (json.loads(row[0]) if row else {})
+        plan['terms_url'] = plan.get('terms_url') or '/terms'
+        plan['support_url'] = plan.get('support_url') or '/seller'
+        return plan
 
     def save_plan(self, plan):
         with self.db.connect() as c:
